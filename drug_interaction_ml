@@ -1188,8 +1188,8 @@ def benchmark_regression_representations(
 def classification_model_specs() -> Dict[str, Tuple[Any, Dict[str, Any]]]:
     return {
         "Logistic Regression": (
-            LogisticRegression(max_iter=2000, solver="liblinear", random_state=RANDOM_SEED, class_weight="balanced"),
-            {"C": loguniform(1e-2, 10.0), "penalty": ["l1", "l2"]},
+            LogisticRegression(max_iter=4000, solver="saga", random_state=RANDOM_SEED, class_weight="balanced"),
+            {"C": loguniform(1e-2, 10.0), "l1_ratio": [0.0, 1.0]},
         ),
         "Random Forest": (
             RandomForestClassifier(random_state=RANDOM_SEED, n_jobs=MAX_PARALLEL_WORKERS, class_weight="balanced_subsample"),

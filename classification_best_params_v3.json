@@ -1,0 +1,40 @@
+{
+  "Extra Trees": {
+    "params": {
+      "max_depth": null,
+      "max_features": "sqrt",
+      "min_samples_leaf": 3,
+      "min_samples_split": 3,
+      "n_estimators": 360
+    },
+    "primary_score": 0.6405663354303479
+  },
+  "HistGradientBoosting": {
+    "params": {
+      "l2_regularization": 0.000533703276260396,
+      "learning_rate": 0.03050945891610522,
+      "max_depth": 12,
+      "max_iter": 207,
+      "max_leaf_nodes": 36,
+      "min_samples_leaf": 34
+    },
+    "primary_score": 0.6446867189946325
+  },
+  "Logistic Regression": {
+    "params": {
+      "C": 0.10025956902289568,
+      "penalty": "l2"
+    },
+    "primary_score": 0.6592861484443081
+  },
+  "Random Forest": {
+    "params": {
+      "max_depth": 32,
+      "max_features": "sqrt",
+      "min_samples_leaf": 3,
+      "min_samples_split": 3,
+      "n_estimators": 224
+    },
+    "primary_score": 0.624930291731353
+  }
+}
