@@ -1,0 +1,22 @@
+{
+  "Extra Trees Regressor": {
+    "params": {
+      "max_depth": 32,
+      "max_features": "sqrt",
+      "min_samples_leaf": 1,
+      "min_samples_split": 5,
+      "n_estimators": 207
+    },
+    "primary_score": -0.9961511539959526
+  },
+  "Random Forest Regressor": {
+    "params": {
+      "max_depth": 24,
+      "max_features": 0.35,
+      "min_samples_leaf": 2,
+      "min_samples_split": 3,
+      "n_estimators": 341
+    },
+    "primary_score": -1.0232564691295822
+  }
+}

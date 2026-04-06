@@ -1,0 +1,29 @@
+{
+  "Extra Trees": {
+    "params": {
+      "max_depth": null,
+      "max_features": "sqrt",
+      "min_samples_leaf": 3,
+      "min_samples_split": 3,
+      "n_estimators": 360
+    },
+    "primary_score": 0.679
+  },
+  "Logistic Regression": {
+    "params": {
+      "C": 0.6251373574521749,
+      "penalty": "l1"
+    },
+    "primary_score": 0.604
+  },
+  "Random Forest": {
+    "params": {
+      "max_depth": 32,
+      "max_features": "sqrt",
+      "min_samples_leaf": 3,
+      "min_samples_split": 3,
+      "n_estimators": 224
+    },
+    "primary_score": 0.678
+  }
+}
