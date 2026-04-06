@@ -1,4 +1,0 @@
-model,params,mean_test_mcc
-Logistic Regression,"{""C"": 0.6251373574521749, ""penalty"": ""l1""}",0.604
-Random Forest,"{""max_depth"": 32, ""max_features"": ""sqrt"", ""min_samples_leaf"": 3, ""min_samples_split"": 3, ""n_estimators"": 224}",0.678
-Extra Trees,"{""max_depth"": null, ""max_features"": ""sqrt"", ""min_samples_leaf"": 3, ""min_samples_split"": 3, ""n_estimators"": 360}",0.679

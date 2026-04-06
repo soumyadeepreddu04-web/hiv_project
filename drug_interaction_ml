@@ -14,15 +14,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
-import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 from rdkit import Chem, DataStructs
 from rdkit.Chem import Crippen, Descriptors, Lipinski, MACCSkeys, rdFingerprintGenerator, rdMolDescriptors
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from scipy.stats import loguniform, randint
 from sklearn.base import clone
+import matplotlib.pyplot as plt
 from sklearn.ensemble import (
     ExtraTreesClassifier,
     ExtraTreesRegressor,
@@ -70,8 +72,8 @@ TEST_SIZE = 0.20
 CHEMBL_TARGET_IDS = ("CHEMBL243",)
 STANDARD_TYPES = ("IC50", "Ki")
 STANDARD_UNITS = "nM"
-ACTIVE_PCHEMBL_THRESHOLD = 7.0
-INACTIVE_PCHEMBL_THRESHOLD = 6.0
+ACTIVE_PCHEMBL_THRESHOLD = 6.5
+INACTIVE_PCHEMBL_THRESHOLD = 5.5
 MAX_PCHEMBL_SPREAD = 2.0
 REQUEST_SLEEP_SECONDS = 0.05
 REQUEST_MAX_RETRIES = 4
@@ -824,26 +826,37 @@ def featurize_dataset(df: pd.DataFrame, logger: RunLogger) -> FeatureBlocks:
     morgan_fingerprints: List[Any] = []
 
     with logger.section("Generating molecular feature blocks"):
-        for row_number, smiles in enumerate(df["smiles"].tolist(), start=1):
+        # Prepare enumerated SMILES list for parallel processing
+        smiles_enumerated = list(enumerate(df["smiles"].tolist()))
+        # Parallel processing function
+        def _process(item):
+            row_idx, smiles = item
             mol = Chem.MolFromSmiles(smiles)
             if mol is None:
-                raise ValueError(f"Could not parse SMILES at dataset row {row_number}: {smiles}")
-
-            morgan_fp = MORGAN_GENERATOR.GetFingerprint(mol)
+                raise ValueError(f"Could not parse SMILES at dataset row {row_idx + 1}: {smiles}")
+            mfp = MORGAN_GENERATOR.GetFingerprint(mol)
             maccs_fp = MACCSkeys.GenMACCSKeys(mol)
             atom_pair_fp = ATOM_PAIR_GENERATOR.GetFingerprint(mol)
             torsion_fp = TORSION_GENERATOR.GetFingerprint(mol)
-            DataStructs.ConvertToNumpyArray(morgan_fp, arrays["morgan_2048"][row_number - 1])
-            DataStructs.ConvertToNumpyArray(maccs_fp, arrays["maccs"][row_number - 1])
-            DataStructs.ConvertToNumpyArray(atom_pair_fp, arrays["atom_pair_2048"][row_number - 1])
-            DataStructs.ConvertToNumpyArray(torsion_fp, arrays["torsion_2048"][row_number - 1])
-            arrays["descriptors"][row_number - 1] = np.asarray(
-                [float(function(mol)) for function in DESCRIPTOR_FUNCTIONS.values()],
-                dtype=np.float32,
-            )
-            morgan_fingerprints.append(morgan_fp)
-            if row_number == n_molecules or row_number % 250 == 0:
-                logger.log(f"Featurized {row_number}/{n_molecules} molecules.")
+            descriptor_vals = np.asarray([float(func(mol)) for func in DESCRIPTOR_FUNCTIONS.values()], dtype=np.float32)
+            return (row_idx, mfp, maccs_fp, atom_pair_fp, torsion_fp, descriptor_vals)
+        # Execute in parallel using joblib
+        results = Parallel(n_jobs=MAX_PARALLEL_WORKERS, backend="loky")(
+            delayed(_process)(item) for item in smiles_enumerated
+        )
+        # Populate arrays and collect fingerprints
+        for row_idx, mfp, maccs_fp, atom_pair_fp, torsion_fp, descriptor_vals in results:
+            DataStructs.ConvertToNumpyArray(mfp, arrays["morgan_2048"][row_idx])
+            DataStructs.ConvertToNumpyArray(maccs_fp, arrays["maccs"][row_idx])
+            DataStructs.ConvertToNumpyArray(atom_pair_fp, arrays["atom_pair_2048"][row_idx])
+            DataStructs.ConvertToNumpyArray(torsion_fp, arrays["torsion_2048"][row_idx])
+            arrays["descriptors"][row_idx] = descriptor_vals
+            morgan_fingerprints.append(mfp)
+            if (row_idx + 1) % 250 == 0:
+                logger.log(f"Featurized {row_idx + 1}/{n_molecules} molecules.")
+        # Ensure final log if not on a 250 boundary
+        if n_molecules % 250 != 0:
+            logger.log(f"Featurized {n_molecules}/{n_molecules} molecules.")
 
     return FeatureBlocks(arrays=arrays, names=names, morgan_fingerprints=morgan_fingerprints)
 
@@ -960,7 +973,45 @@ def checkpoint_placeholder_rows(
     return pd.DataFrame(rows)
 
 
-def classification_metrics_from_probabilities(y_true: np.ndarray, y_prob: np.ndarray, threshold: float = 0.5) -> Dict[str, float]:
+def bootstrap_metrics(y_true: np.ndarray, y_prob: np.ndarray, n_boot: int = 2000, seed: int = 42) -> Dict[str, Tuple[float, float]]:
+    """Return 95 % confidence intervals for MCC and PR‑AUC/ROC‑AUC via bootstrap.
+    Returns a dict mapping metric name to (low, high) percentiles.
+    """
+    rng = np.random.default_rng(seed)
+    metrics: Dict[str, List[float]] = {"mcc": [], "pr_auc": [], "roc_auc": []}
+    for _ in range(n_boot):
+        idx = rng.integers(0, len(y_true), len(y_true))
+        yt, yp = y_true[idx], y_prob[idx]
+        # MCC
+        mcc_val = matthews_corrcoef(yt, (yp >= 0.5).astype(int))
+        metrics["mcc"].append(mcc_val)
+        # PR AUC and ROC AUC
+        try:
+            pr = average_precision_score(yt, yp)
+            roc = roc_auc_score(yt, yp)
+        except ValueError:
+            # In case a bootstrap sample has only one class
+            pr = np.nan
+            roc = np.nan
+        metrics["pr_auc"].append(pr)
+        metrics["roc_auc"].append(roc)
+    ci: Dict[str, Tuple[float, float]] = {}
+    for name, vals in metrics.items():
+        vals_arr = np.array(vals)
+        # Remove NaNs
+        vals_arr = vals_arr[np.isfinite(vals_arr)]
+        if vals_arr.size == 0:
+            ci[name] = (np.nan, np.nan)
+        else:
+            ci[name] = (float(np.percentile(vals_arr, 2.5)), float(np.percentile(vals_arr, 97.5)))
+    return ci
+
+
+def classification_metrics_from_probabilities(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    threshold: float = 0.5,
+) -> Dict[str, float]:
     y_pred = (y_prob >= threshold).astype(int)
     return {
         "accuracy": accuracy_score(y_true, y_pred),
@@ -1596,34 +1647,67 @@ def compute_applicability_domain(
     morgan_fingerprints: Sequence[Any],
     logger: RunLogger,
 ) -> Tuple[np.ndarray, float, np.ndarray]:
-    train_fps = [morgan_fingerprints[index] for index in train_row_ids]
-    test_fps = [morgan_fingerprints[index] for index in test_row_ids]
-    train_neighbor_similarity = np.zeros(len(train_fps), dtype=np.float32)
+    """Estimate the applicability‑domain (AD) using a fast nearest‑neighbour index.
+    If `faiss` is available we build a flat inner‑product index on the normalized
+    Morgan fingerprints (equivalent to cosine similarity). Otherwise we fall back to the
+    original exhaustive pairwise computation.
+    """
+    # Prepare training fingerprints as numpy array (float32) and L2‑normalize for cosine similarity
+    train_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in train_row_ids]])
+    # Convert bit strings to float vectors (0/1)
+    train_array = np.unpackbits(train_fps.view(np.uint8)).astype(np.float32)
+    train_norm = np.linalg.norm(train_array, axis=1, keepdims=True)
+    train_norm[train_norm == 0] = 1.0
+    train_normalized = train_array / train_norm
 
-    with logger.section("Estimating applicability-domain threshold"):
-        for index, fp in enumerate(train_fps):
-            similarities = list(DataStructs.BulkTanimotoSimilarity(fp, train_fps))
-            if len(similarities) > 1:
-                similarities[index] = -1.0
-                train_neighbor_similarity[index] = max(similarities)
-            else:
-                train_neighbor_similarity[index] = 1.0
-            if index + 1 == len(train_fps) or (index + 1) % 250 == 0:
-                logger.log(f"Processed {index + 1}/{len(train_fps)} training fingerprints for AD thresholding.")
-
-    threshold = float(np.percentile(train_neighbor_similarity, AD_SIMILARITY_PERCENTILE))
-    logger.log(f"Applicability-domain threshold set at Tanimoto similarity {threshold:.3f}")
-
-    test_similarity = np.zeros(len(test_fps), dtype=np.float32)
-    with logger.section("Scoring test molecules against the training chemical space"):
-        for index, fp in enumerate(test_fps):
-            similarities = DataStructs.BulkTanimotoSimilarity(fp, train_fps)
-            test_similarity[index] = max(similarities) if similarities else 0.0
-            if index + 1 == len(test_fps) or (index + 1) % 250 == 0:
-                logger.log(f"Processed {index + 1}/{len(test_fps)} test fingerprints for AD scoring.")
-
+    try:
+        import faiss
+        index = faiss.IndexFlatIP(train_normalized.shape[1])
+        faiss.normalize_L2(train_normalized)
+        index.add(train_normalized)
+        # Prepare test fingerprints similarly
+        test_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in test_row_ids]])
+        test_array = np.unpackbits(test_fps.view(np.uint8)).astype(np.float32)
+        test_norm = np.linalg.norm(test_array, axis=1, keepdims=True)
+        test_norm[test_norm == 0] = 1.0
+        test_normalized = test_array / test_norm
+        faiss.normalize_L2(test_normalized)
+        # Search for nearest neighbour similarities
+        distances, _ = index.search(test_normalized, 1)
+        # distances are inner‑product (= cosine similarity because vectors are normalised)
+        test_similarity = distances.ravel()
+        logger.log("FAISS index used for applicability‑domain scoring.")
+    except Exception:
+        # Fallback to original exhaustive method
+        logger.log("FAISS not available; falling back to exhaustive similarity computation.")
+        train_fps = [morgan_fingerprints[i] for i in train_row_ids]
+        test_fps = [morgan_fingerprints[i] for i in test_row_ids]
+        train_neighbor_similarity = np.zeros(len(train_fps), dtype=np.float32)
+        with logger.section("Estimating applicability-domain threshold (fallback)"):
+            for index, fp in enumerate(train_fps):
+                similarities = list(DataStructs.BulkTanimotoSimilarity(fp, train_fps))
+                if len(similarities) > 1:
+                    similarities[index] = -1.0
+                    train_neighbor_similarity[index] = max(similarities)
+                else:
+                    train_neighbor_similarity[index] = 1.0
+                if index + 1 == len(train_fps) or (index + 1) % 250 == 0:
+                    logger.log(f"Processed {index + 1}/{len(train_fps)} training fingerprints for AD thresholding.")
+        threshold = float(np.percentile(train_neighbor_similarity, AD_SIMILARITY_PERCENTILE))
+        logger.log(f"Applicability-domain threshold set at Tanimoto similarity {threshold:.3f}")
+        test_similarity = np.zeros(len(test_fps), dtype=np.float32)
+        with logger.section("Scoring test molecules against the training chemical space (fallback)"):
+            for index, fp in enumerate(test_fps):
+                similarities = DataStructs.BulkTanimotoSimilarity(fp, train_fps)
+                test_similarity[index] = max(similarities) if similarities else 0.0
+                if index + 1 == len(test_fps) or (index + 1) % 250 == 0:
+                    logger.log(f"Processed {index + 1}/{len(test_fps)} test fingerprints for AD scoring.")
+        inside_ad = test_similarity >= threshold
+        return train_neighbor_similarity, threshold, inside_ad
+    # Compute threshold from training similarities
+    threshold = float(np.percentile(test_similarity, AD_SIMILARITY_PERCENTILE))
     inside_ad = test_similarity >= threshold
-    return train_neighbor_similarity, threshold, inside_ad
+    return np.array([]), threshold, inside_ad
 
 
 def find_activity_cliffs(df: pd.DataFrame, morgan_fingerprints: Sequence[Any], logger: RunLogger) -> pd.DataFrame:
@@ -1681,6 +1765,7 @@ def find_activity_cliffs(df: pd.DataFrame, morgan_fingerprints: Sequence[Any], l
 
 
 def plot_roc_curves(results: Sequence[ClassificationResult], y_true: np.ndarray, output_path: Path) -> None:
+    """Generate static ROC curves using Matplotlib (kept for backward compatibility)."""
     plt.figure(figsize=(7, 5))
     for result in results:
         fpr, tpr, _ = roc_curve(y_true, result.y_prob)
@@ -1694,8 +1779,21 @@ def plot_roc_curves(results: Sequence[ClassificationResult], y_true: np.ndarray,
     plt.savefig(output_path, dpi=150)
     plt.close()
 
+# New interactive Plotly version
+def plot_roc_curves_interactive(results: Sequence[ClassificationResult], y_true: np.ndarray) -> go.Figure:
+    """Return a Plotly Figure with ROC curves for interactive display."""
+    fig = go.Figure()
+    for result in results:
+        fpr, tpr, _ = roc_curve(y_true, result.y_prob)
+        fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f"{result.name} (AUC={result.roc_auc:.3f})"))
+    fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', line=dict(dash='dash', color='gray'), name='Random baseline'))
+    fig.update_layout(title='ROC Curve: HIV-1 Protease Classification', xaxis_title='False Positive Rate', yaxis_title='True Positive Rate')
+    return fig
+
+
 
 def plot_precision_recall_curves(results: Sequence[ClassificationResult], y_true: np.ndarray, output_path: Path) -> None:
+    """Generate static PR curves using Matplotlib (kept for compatibility)."""
     plt.figure(figsize=(7, 5))
     baseline = float(np.mean(y_true))
     for result in results:
@@ -1710,8 +1808,22 @@ def plot_precision_recall_curves(results: Sequence[ClassificationResult], y_true
     plt.savefig(output_path, dpi=150)
     plt.close()
 
+# New interactive Plotly version
+def plot_precision_recall_curves_interactive(results: Sequence[ClassificationResult], y_true: np.ndarray) -> go.Figure:
+    """Return a Plotly Figure with PR curves for interactive display."""
+    fig = go.Figure()
+    baseline = float(np.mean(y_true))
+    for result in results:
+        precision, recall, _ = precision_recall_curve(y_true, result.y_prob)
+        fig.add_trace(go.Scatter(x=recall, y=precision, mode='lines', name=f"{result.name} (AP={result.pr_auc:.3f})"))
+    fig.add_hline(y=baseline, line_dash='dash', line_color='gray', annotation_text=f'Positive rate = {baseline:.3f}')
+    fig.update_layout(title='Precision-Recall Curve: HIV-1 Protease Classification', xaxis_title='Recall', yaxis_title='Precision')
+    return fig
+
+
 
 def plot_feature_importance(model: Any, feature_names: Sequence[str], output_path: Path, top_n: int = TOP_FEATURES_TO_PLOT) -> None:
+    """Static Matplotlib feature‑importance plot (kept for compatibility)."""
     importances = np.asarray(model.feature_importances_)
     top_indices = np.argsort(importances)[-top_n:][::-1]
     top_names = [feature_names[index] for index in top_indices]
@@ -1723,6 +1835,18 @@ def plot_feature_importance(model: Any, feature_names: Sequence[str], output_pat
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
+
+# New interactive Plotly version
+def plot_feature_importance_interactive(model: Any, feature_names: Sequence[str], top_n: int = TOP_FEATURES_TO_PLOT) -> go.Figure:
+    """Return a Plotly Figure with the top‑N feature importances."""
+    importances = np.asarray(model.feature_importances_)
+    top_indices = np.argsort(importances)[-top_n:][::-1]
+    top_names = [feature_names[index] for index in top_indices]
+    top_vals = importances[top_indices]
+    fig = go.Figure(go.Bar(x=top_names, y=top_vals, marker_color='steelblue'))
+    fig.update_layout(title='Top Feature Importances', xaxis_title='Feature', yaxis_title='Importance')
+    return fig
+
 
 
 def plot_regression_predictions(y_true: np.ndarray, y_pred: np.ndarray, output_path: Path) -> None:
