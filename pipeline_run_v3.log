@@ -1,123 +1,99 @@
 [     0.0s] Pipeline run started.
+[     0.0s] === RERUN: Classification predictions only ===
 [     0.0s] AMD GPU detected (AMD Radeon R7 M440), but this environment has no working ROCm/OpenCL ML backend installed (modules found: none, env vars: none). The pipeline now runs CPU-first and does not attempt the old broken GPU training path.
-[     0.0s] Run profile = full; CPU workers = 1; classification CV = 5; regression CV = 5; classification search iters = 6; regression search iters = 6; benchmark trees = 160
 [     0.0s] Loading cached curated dataset from hiv_protease_chembl_dataset_v3.csv
 [     0.1s] Classification dataset assembled with 4058 molecules (3637 actives, 421 inactives).
-[     0.1s] Regression dataset assembled with 4621 molecules spanning pChEMBL 4.00 to 11.00.
 [     0.1s] Generating molecular feature blocks...
-[    38.0s] Featurized 250/4621 molecules.
-[    38.1s] Featurized 500/4621 molecules.
-[    38.1s] Featurized 750/4621 molecules.
-[    38.2s] Featurized 1000/4621 molecules.
-[    38.3s] Featurized 1250/4621 molecules.
-[    38.4s] Featurized 1500/4621 molecules.
-[    38.5s] Featurized 1750/4621 molecules.
-[    38.6s] Featurized 2000/4621 molecules.
-[    38.7s] Featurized 2250/4621 molecules.
-[    38.8s] Featurized 2500/4621 molecules.
-[    38.9s] Featurized 2750/4621 molecules.
-[    39.0s] Featurized 3000/4621 molecules.
-[    39.1s] Featurized 3250/4621 molecules.
-[    39.3s] Featurized 3500/4621 molecules.
-[    39.4s] Featurized 3750/4621 molecules.
-[    39.5s] Featurized 4000/4621 molecules.
-[    39.6s] Featurized 4250/4621 molecules.
-[    39.7s] Featurized 4500/4621 molecules.
-[    39.7s] Featurized 4621/4621 molecules.
-[    39.7s] Generating molecular feature blocks finished in 39.6s.
-[    40.8s] Scaffold classification split: train=3246 (0.896 positive), test=812 (0.895 positive).
-[    40.9s] Scaffold regression split: train=3765 molecules, test=856 molecules.
-[    41.0s] Temporal split built with train years <= 2003 and test years [2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2016, 2017, 2020, 2021, 2022, 2023, 2024].
-[    41.2s] Temporal split built with train years <= 2003 and test years [2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2016, 2017, 2020, 2021, 2022, 2023, 2024].
-[    41.2s] Resuming classification benchmarks with 6 cached representations: all_fingerprints_plus_descriptors, atom_pair_torsion_plus_descriptors, descriptors, maccs_plus_descriptors, morgan_2048, morgan_plus_descriptors
-[    41.2s] Skipping classification representation 'morgan_2048' because it is already checkpointed.
-[    41.2s] Skipping classification representation 'descriptors' because it is already checkpointed.
-[    41.2s] Skipping classification representation 'morgan_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping classification representation 'maccs_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping classification representation 'atom_pair_torsion_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping classification representation 'all_fingerprints_plus_descriptors' because it is already checkpointed.
-[    41.2s] Best classification representation: morgan_2048 (mean MCC=0.530)
-[    41.2s] Resuming regression benchmarks with 6 cached representations: all_fingerprints_plus_descriptors, atom_pair_torsion_plus_descriptors, descriptors, maccs_plus_descriptors, morgan_2048, morgan_plus_descriptors
-[    41.2s] Skipping regression representation 'morgan_2048' because it is already checkpointed.
-[    41.2s] Skipping regression representation 'descriptors' because it is already checkpointed.
-[    41.2s] Skipping regression representation 'morgan_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping regression representation 'maccs_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping regression representation 'atom_pair_torsion_plus_descriptors' because it is already checkpointed.
-[    41.2s] Skipping regression representation 'all_fingerprints_plus_descriptors' because it is already checkpointed.
-[    41.2s] Best regression representation: maccs_plus_descriptors (mean RMSE=1.058)
-[    41.3s] Hyperparameter search for classification models...
-[    41.3s] Resuming classification tuning with 2 cached models: Logistic Regression, Random Forest
-[    41.3s] Restoring checkpointed classification model 'Logistic Regression' on the scaffold-training split.
-[    70.1s] Skipping classification model 'Logistic Regression' because it is already checkpointed.
-[    70.1s] Restoring checkpointed classification model 'Random Forest' on the scaffold-training split.
-[    77.1s] Skipping classification model 'Random Forest' because it is already checkpointed.
-[    77.1s] Tuning classification model 'Extra Trees' with 5-fold CV
-[  2487.0s]   Best Extra Trees: CV MCC=0.641, params={'max_depth': None, 'max_features': 'sqrt', 'min_samples_leaf': 3, 'min_samples_split': 3, 'n_estimators': 360}
-[  2487.0s] Tuning classification model 'HistGradientBoosting' with 5-fold CV
-[  3491.7s]   Best HistGradientBoosting: CV MCC=0.645, params={'l2_regularization': 0.000533703276260396, 'learning_rate': 0.03050945891610522, 'max_depth': 12, 'max_iter': 207, 'max_leaf_nodes': 36, 'min_samples_leaf': 34}
-[  3491.7s] Hyperparameter search for classification models finished in 3450.5s.
-[  3491.8s] Training stacked classification ensemble...
-[  3492.6s] Training stacking fold 1/5
-[  3556.2s] Training stacking fold 2/5
-[  3621.2s] Training stacking fold 3/5
-[  3685.3s] Training stacking fold 4/5
-[  3743.4s] Training stacking fold 5/5
-[  3861.9s] Training stacked classification ensemble finished in 370.2s.
-[  3861.9s] Training SMOTE-enhanced Extra Trees baseline...
-[  3895.8s] Training SMOTE-enhanced Extra Trees baseline finished in 33.9s.
-[  3895.8s] Evaluating classification models on scaffold holdout...
-[  3895.8s]   Evaluating classification model 'Logistic Regression'
-[  3895.8s]     Logistic Regression: MCC=0.536, PR-AUC=0.986, ROC-AUC=0.906
-[  3895.8s]   Evaluating classification model 'Random Forest'
-[  3896.0s]     Random Forest: MCC=0.360, PR-AUC=0.984, ROC-AUC=0.888
-[  3896.0s]   Evaluating classification model 'Extra Trees'
-[  3896.2s]     Extra Trees: MCC=0.373, PR-AUC=0.981, ROC-AUC=0.867
-[  3896.2s]   Evaluating classification model 'HistGradientBoosting'
-[  3896.3s]     HistGradientBoosting: MCC=0.512, PR-AUC=0.984, ROC-AUC=0.888
-[  3896.3s]   Evaluating classification model 'Stacked Ensemble'
-[  3896.7s]     Stacked Ensemble: MCC=0.413, PR-AUC=0.984, ROC-AUC=0.891
-[  3896.7s]   Evaluating classification model 'Extra Trees + SMOTE'
-[  3897.0s]     Extra Trees + SMOTE: MCC=0.522, PR-AUC=0.984, ROC-AUC=0.892
-[  3897.0s] Evaluating classification models on scaffold holdout finished in 1.2s.
-[  3897.0s] Computed scaffold classification metrics for 6 model(s).
-[  3897.0s] Best scaffold-holdout classifier: Logistic Regression (MCC=0.536, PR-AUC=0.986)
-[  3897.0s] Evaluating best classifier on temporal split...
-[  3920.1s]   Evaluating classification model 'Logistic Regression'
-[  3920.2s]     Logistic Regression: MCC=0.411, PR-AUC=0.959, ROC-AUC=0.785
-[  3920.2s] Evaluating best classifier on temporal split finished in 23.1s.
-[  3920.2s] Hyperparameter search for regression models...
-[  3920.2s] Tuning regression model 'Random Forest Regressor' with 5-fold grouped CV
-[  4051.3s]   Best Random Forest Regressor: CV RMSE=1.055, params={'max_depth': 24, 'max_features': 'sqrt', 'min_samples_leaf': 1, 'min_samples_split': 5, 'n_estimators': 207}
-[  4051.3s] Tuning regression model 'Extra Trees Regressor' with 5-fold grouped CV
-[  4236.5s]   Best Extra Trees Regressor: CV RMSE=1.024, params={'max_depth': 32, 'max_features': 0.35, 'min_samples_leaf': 2, 'min_samples_split': 3, 'n_estimators': 341}
-[  4236.5s] Tuning regression model 'HistGradientBoostingRegressor' with 5-fold grouped CV
-[  4374.6s]   Best HistGradientBoostingRegressor: CV RMSE=1.068, params={'l2_regularization': 0.006672367170464205, 'learning_rate': 0.12195678219063029, 'max_depth': 8, 'max_iter': 257, 'max_leaf_nodes': 69, 'min_samples_leaf': 12}
-[  4374.6s] Hyperparameter search for regression models finished in 454.4s.
-[  4374.6s] Evaluating regression models on scaffold holdout...
-[  4374.6s]   Evaluating regression model 'Random Forest Regressor'
-[  4374.7s]     Random Forest Regressor: RMSE=1.013, MAE=0.762, R2=0.571
-[  4374.7s]   Evaluating regression model 'Extra Trees Regressor'
-[  4374.8s]     Extra Trees Regressor: RMSE=1.013, MAE=0.748, R2=0.571
-[  4374.8s]   Evaluating regression model 'HistGradientBoostingRegressor'
-[  4374.9s]     HistGradientBoostingRegressor: RMSE=0.998, MAE=0.730, R2=0.584
-[  4374.9s] Evaluating regression models on scaffold holdout finished in 0.3s.
-[  4374.9s] Computed scaffold regression metrics for 3 model(s).
-[  4374.9s] Best scaffold-holdout regressor: HistGradientBoostingRegressor (RMSE=0.998, R2=0.584)
-[  4374.9s] Evaluating best regressor on temporal split...
-[  4378.9s]   Evaluating regression model 'HistGradientBoostingRegressor'
-[  4379.0s]     HistGradientBoostingRegressor: RMSE=1.414, MAE=1.132, R2=0.232
-[  4379.0s] Evaluating best regressor on temporal split finished in 4.2s.
-[  4382.4s] Feature-importance plot written using Extra Trees + SMOTE.
-Traceback (most recent call last):
-  File "c:\Users\Kuldeep Singh\.vscode\hiv_project\drug_interaction_ml", line 2316, in <module>
-    main()
-  File "c:\Users\Kuldeep Singh\.vscode\hiv_project\drug_interaction_ml", line 2244, in main
-    _, ad_threshold, inside_ad = compute_applicability_domain(
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "c:\Users\Kuldeep Singh\.vscode\hiv_project\drug_interaction_ml", line 1659, in compute_applicability_domain
-    train_norm = np.linalg.norm(train_array, axis=1, keepdims=True)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Kuldeep Singh\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\linalg\_linalg.py", line 2829, in norm
-    return sqrt(add.reduce(s, axis=axis, keepdims=keepdims))
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-numpy.exceptions.AxisError: axis 1 is out of bounds for array of dimension 1
+[    25.6s] Featurized 250/4621 molecules.
+[    25.7s] Featurized 500/4621 molecules.
+[    25.7s] Featurized 750/4621 molecules.
+[    25.8s] Featurized 1000/4621 molecules.
+[    25.9s] Featurized 1250/4621 molecules.
+[    26.0s] Featurized 1500/4621 molecules.
+[    26.0s] Featurized 1750/4621 molecules.
+[    26.1s] Featurized 2000/4621 molecules.
+[    26.2s] Featurized 2250/4621 molecules.
+[    26.3s] Featurized 2500/4621 molecules.
+[    26.4s] Featurized 2750/4621 molecules.
+[    26.5s] Featurized 3000/4621 molecules.
+[    26.6s] Featurized 3250/4621 molecules.
+[    26.7s] Featurized 3500/4621 molecules.
+[    26.7s] Featurized 3750/4621 molecules.
+[    26.8s] Featurized 4000/4621 molecules.
+[    26.9s] Featurized 4250/4621 molecules.
+[    26.9s] Featurized 4500/4621 molecules.
+[    27.0s] Featurized 4621/4621 molecules.
+[    27.0s] Generating molecular feature blocks finished in 26.9s.
+[    27.7s] Scaffold classification split: train=3246 (0.896 positive), test=812 (0.895 positive).
+[    27.9s] Temporal split built with train years <= 2003 and test years [2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2016, 2017, 2020, 2021, 2022, 2023, 2024].
+[    27.9s] Resuming classification benchmarks with 6 cached representations: all_fingerprints_plus_descriptors, atom_pair_torsion_plus_descriptors, descriptors, maccs_plus_descriptors, morgan_2048, morgan_plus_descriptors
+[    27.9s] Skipping classification representation 'morgan_2048' because it is already checkpointed.
+[    27.9s] Skipping classification representation 'descriptors' because it is already checkpointed.
+[    27.9s] Skipping classification representation 'morgan_plus_descriptors' because it is already checkpointed.
+[    27.9s] Skipping classification representation 'maccs_plus_descriptors' because it is already checkpointed.
+[    27.9s] Skipping classification representation 'atom_pair_torsion_plus_descriptors' because it is already checkpointed.
+[    27.9s] Skipping classification representation 'all_fingerprints_plus_descriptors' because it is already checkpointed.
+[    27.9s] Best classification representation: morgan_2048 (mean MCC=0.530)
+[    27.9s] Hyperparameter search for classification models...
+[    28.0s] Resuming classification tuning with 4 cached models: Extra Trees, HistGradientBoosting, Logistic Regression, Random Forest
+[    28.0s] Restoring checkpointed classification model 'Logistic Regression' on the scaffold-training split.
+[    47.6s] Skipping classification model 'Logistic Regression' because it is already checkpointed.
+[    47.6s] Restoring checkpointed classification model 'Random Forest' on the scaffold-training split.
+[    52.8s] Skipping classification model 'Random Forest' because it is already checkpointed.
+[    52.8s] Restoring checkpointed classification model 'Extra Trees' on the scaffold-training split.
+[    67.1s] Skipping classification model 'Extra Trees' because it is already checkpointed.
+[    67.1s] Restoring checkpointed classification model 'HistGradientBoosting' on the scaffold-training split.
+[   100.8s] Skipping classification model 'HistGradientBoosting' because it is already checkpointed.
+[   100.8s] Hyperparameter search for classification models finished in 72.8s.
+[   100.8s] Training stacked classification ensemble...
+[   101.5s] Training stacking fold 1/5
+[   145.9s] Training stacking fold 2/5
+[   191.1s] Training stacking fold 3/5
+[   235.2s] Training stacking fold 4/5
+[   279.3s] Training stacking fold 5/5
+[   375.7s] Training stacked classification ensemble finished in 274.9s.
+[   375.7s] Training SMOTE-enhanced Extra Trees baseline...
+[   400.1s] Training SMOTE-enhanced Extra Trees baseline finished in 24.4s.
+[   400.1s] Evaluating classification models on scaffold holdout...
+[   400.1s]   Evaluating classification model 'Logistic Regression'
+[   400.1s]     Logistic Regression: MCC=0.536, PR-AUC=0.986, ROC-AUC=0.906
+[   400.1s]   Evaluating classification model 'Random Forest'
+[   400.2s]     Random Forest: MCC=0.360, PR-AUC=0.984, ROC-AUC=0.888
+[   400.2s]   Evaluating classification model 'Extra Trees'
+[   400.5s]     Extra Trees: MCC=0.373, PR-AUC=0.981, ROC-AUC=0.867
+[   400.5s]   Evaluating classification model 'HistGradientBoosting'
+[   400.6s]     HistGradientBoosting: MCC=0.512, PR-AUC=0.984, ROC-AUC=0.888
+[   400.6s]   Evaluating classification model 'Stacked Ensemble'
+[   400.9s]     Stacked Ensemble: MCC=0.413, PR-AUC=0.984, ROC-AUC=0.891
+[   400.9s]   Evaluating classification model 'Extra Trees + SMOTE'
+[   401.1s]     Extra Trees + SMOTE: MCC=0.522, PR-AUC=0.984, ROC-AUC=0.892
+[   401.1s] Evaluating classification models on scaffold holdout finished in 1.0s.
+[   401.1s] Best scaffold-holdout classifier: Logistic Regression (MCC=0.536, PR-AUC=0.986)
+[   401.2s] Evaluating best classifier on temporal split...
+[   419.9s]   Evaluating classification model 'Logistic Regression'
+[   419.9s]     Logistic Regression: MCC=0.411, PR-AUC=0.959, ROC-AUC=0.785
+[   419.9s] Evaluating best classifier on temporal split finished in 18.7s.
+[   421.3s] Feature-importance plot written using Extra Trees + SMOTE.
+[   423.1s] FAISS index used for applicability‑domain scoring.
+[   423.2s] Searching for activity cliffs...
+[   423.8s] Activity-cliff scan progress: 250/4620 anchors processed.
+[   424.3s] Activity-cliff scan progress: 500/4620 anchors processed.
+[   424.8s] Activity-cliff scan progress: 750/4620 anchors processed.
+[   425.2s] Activity-cliff scan progress: 1000/4620 anchors processed.
+[   425.7s] Activity-cliff scan progress: 1250/4620 anchors processed.
+[   426.0s] Activity-cliff scan progress: 1500/4620 anchors processed.
+[   426.4s] Activity-cliff scan progress: 1750/4620 anchors processed.
+[   426.6s] Activity-cliff scan progress: 2000/4620 anchors processed.
+[   426.9s] Activity-cliff scan progress: 2250/4620 anchors processed.
+[   427.1s] Activity-cliff scan progress: 2500/4620 anchors processed.
+[   427.3s] Activity-cliff scan progress: 2750/4620 anchors processed.
+[   427.5s] Activity-cliff scan progress: 3000/4620 anchors processed.
+[   427.7s] Activity-cliff scan progress: 3250/4620 anchors processed.
+[   427.8s] Activity-cliff scan progress: 3500/4620 anchors processed.
+[   427.9s] Activity-cliff scan progress: 3750/4620 anchors processed.
+[   427.9s] Activity-cliff scan progress: 4000/4620 anchors processed.
+[   428.0s] Activity-cliff scan progress: 4250/4620 anchors processed.
+[   428.0s] Activity-cliff scan progress: 4500/4620 anchors processed.
+[   428.0s] Activity-cliff scan progress: 4620/4620 anchors processed.
+[   428.0s] Searching for activity cliffs finished in 4.8s.
+[   428.0s] Detected 300 activity cliffs above the similarity and potency-delta thresholds.

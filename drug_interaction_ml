@@ -1655,7 +1655,7 @@ def compute_applicability_domain(
     # Prepare training fingerprints as numpy array (float32) and L2‑normalize for cosine similarity
     train_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in train_row_ids]])
     # Convert bit strings to float vectors (0/1)
-    train_array = np.unpackbits(train_fps.view(np.uint8)).astype(np.float32)
+    train_array = np.unpackbits(train_fps.view(np.uint8), axis=1).astype(np.float32)
     train_norm = np.linalg.norm(train_array, axis=1, keepdims=True)
     train_norm[train_norm == 0] = 1.0
     train_normalized = train_array / train_norm
@@ -1667,7 +1667,7 @@ def compute_applicability_domain(
         index.add(train_normalized)
         # Prepare test fingerprints similarly
         test_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in test_row_ids]])
-        test_array = np.unpackbits(test_fps.view(np.uint8)).astype(np.float32)
+        test_array = np.unpackbits(test_fps.view(np.uint8), axis=1).astype(np.float32)
         test_norm = np.linalg.norm(test_array, axis=1, keepdims=True)
         test_norm[test_norm == 0] = 1.0
         test_normalized = test_array / test_norm
