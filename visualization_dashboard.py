@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import importlib.util
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from types import ModuleType
 
 import pandas as pd
 import streamlit as st
-from PIL import Image
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 
@@ -22,8 +23,20 @@ REGRESSION_PLOT_PATH = DATA_DIR / "regression_predictions.png"
 FEATURE_IMPORTANCE_PATH = DATA_DIR / "feature_importance.png"
 
 
-def load_pipeline_module():
-    return SourceFileLoader("drug_interaction_ml_runtime", str(PIPELINE_PATH)).load_module()
+@st.cache_resource
+def load_pipeline_module() -> ModuleType:
+    loader = SourceFileLoader("drug_interaction_ml_runtime", str(PIPELINE_PATH))
+    spec = importlib.util.spec_from_loader(loader.name, loader, origin=str(PIPELINE_PATH))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load pipeline module from {PIPELINE_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@st.cache_data
+def load_csv(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path)
 
 
 pipeline = load_pipeline_module()
@@ -76,18 +89,18 @@ st.title("HIV-1 Protease ML Pipeline Dashboard")
 
 if CLASS_METRICS.exists():
     st.subheader("Classification Summary")
-    st.dataframe(pd.read_csv(CLASS_METRICS))
+    st.dataframe(load_csv(CLASS_METRICS))
 else:
     st.warning("Classification metrics file not found.")
 
 if REGRESSION_METRICS.exists():
     st.subheader("Regression Summary")
-    st.dataframe(pd.read_csv(REGRESSION_METRICS))
+    st.dataframe(load_csv(REGRESSION_METRICS))
 else:
     st.warning("Regression metrics file not found.")
 
 if CLASS_PRED.exists():
-    pred_df = pd.read_csv(CLASS_PRED)
+    pred_df = load_csv(CLASS_PRED)
     y_true, results = build_classification_results(pred_df)
     if y_true is not None and results:
         st.subheader("ROC Curves")
@@ -102,13 +115,13 @@ else:
 
 if REGRESSION_PLOT_PATH.exists():
     st.subheader("Regression Predictions")
-    st.image(Image.open(REGRESSION_PLOT_PATH), caption="Regression Predictions", use_container_width=True)
+    st.image(str(REGRESSION_PLOT_PATH), caption="Regression Predictions", use_container_width=True)
 else:
     st.warning("Regression predictions image not found.")
 
 st.subheader("Feature Importance")
 if FEATURE_IMPORTANCE_PATH.exists():
-    st.image(Image.open(FEATURE_IMPORTANCE_PATH), caption="Feature Importance", use_container_width=True)
+    st.image(str(FEATURE_IMPORTANCE_PATH), caption="Feature Importance", use_container_width=True)
 else:
     st.info("Feature importance image not available.")
 

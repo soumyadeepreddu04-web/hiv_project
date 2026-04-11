@@ -19,12 +19,15 @@ from __future__ import annotations
 
 import json
 import traceback
+import importlib.machinery
+import importlib.util
+import pathlib
+import sys
+
 import numpy as np
-import pandas as pd
 
 # Import everything we need from the main pipeline module.
 # The file has no .py extension, so we import it via importlib.
-import importlib.util, importlib.machinery, pathlib, sys
 
 _file_path = str(pathlib.Path(__file__).resolve().parent / "drug_interaction_ml")
 _loader = importlib.machinery.SourceFileLoader("drug_interaction_ml", _file_path)
@@ -56,7 +59,6 @@ select_feature_importance_model     = dti.select_feature_importance_model
 plot_feature_importance             = dti.plot_feature_importance
 compute_applicability_domain        = dti.compute_applicability_domain
 find_activity_cliffs                = dti.find_activity_cliffs
-print_summary                       = dti.print_summary
 
 # Paths
 RUN_LOG_PATH                        = dti.RUN_LOG_PATH
@@ -70,8 +72,6 @@ ACTIVITY_CLIFF_PATH                 = dti.ACTIVITY_CLIFF_PATH
 RUN_REPORT_PATH                     = dti.RUN_REPORT_PATH
 TEMPORAL_CLASSIFICATION_TRAIN_PATH  = dti.TEMPORAL_CLASSIFICATION_TRAIN_PATH
 TEMPORAL_CLASSIFICATION_TEST_PATH   = dti.TEMPORAL_CLASSIFICATION_TEST_PATH
-CLASSIFICATION_CV_FOLDS             = dti.CLASSIFICATION_CV_FOLDS
-ClassificationResult                = dti.ClassificationResult
 
 
 def main() -> None:
