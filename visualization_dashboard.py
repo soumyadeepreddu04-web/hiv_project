@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+import sys
 from types import ModuleType
 
 import pandas as pd
@@ -25,11 +26,13 @@ FEATURE_IMPORTANCE_PATH = DATA_DIR / "feature_importance.png"
 
 @st.cache_resource
 def load_pipeline_module() -> ModuleType:
-    loader = SourceFileLoader("drug_interaction_ml_runtime", str(PIPELINE_PATH))
-    spec = importlib.util.spec_from_loader(loader.name, loader, origin=str(PIPELINE_PATH))
+    module_name = "drug_interaction_ml_runtime"
+    loader = SourceFileLoader(module_name, str(PIPELINE_PATH))
+    spec = importlib.util.spec_from_file_location(module_name, str(PIPELINE_PATH), loader=loader)
     if spec is None or spec.loader is None:
         raise ImportError(f"Unable to load pipeline module from {PIPELINE_PATH}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 

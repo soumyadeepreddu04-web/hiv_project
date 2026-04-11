@@ -17,25 +17,31 @@ It does NOT rerun data fetching, featurization, or regression.
 """
 from __future__ import annotations
 
-import json
-import traceback
 import importlib.machinery
 import importlib.util
+import json
 import pathlib
 import sys
+import traceback
 
 import numpy as np
 
 # Import everything we need from the main pipeline module.
 # The file has no .py extension, so we import it via importlib.
-
 _file_path = str(pathlib.Path(__file__).resolve().parent / "drug_interaction_ml")
-_loader = importlib.machinery.SourceFileLoader("drug_interaction_ml", _file_path)
-_spec = importlib.util.spec_from_loader("drug_interaction_ml", _loader, origin=_file_path)
+_module_name = "drug_interaction_ml"
+_loader = importlib.machinery.SourceFileLoader(_module_name, _file_path)
+_spec = importlib.util.spec_from_file_location(_module_name, _file_path, loader=_loader)
+if _spec is None or _spec.loader is None:
+    raise ImportError(f"Unable to load pipeline module from {_file_path}")
 dti = importlib.util.module_from_spec(_spec)
 dti.__file__ = _file_path
-sys.modules["drug_interaction_ml"] = dti
-_spec.loader.exec_module(dti)
+sys.modules[_module_name] = dti
+try:
+    _spec.loader.exec_module(dti)
+except Exception as exc:
+    sys.modules.pop(_module_name, None)
+    raise ImportError(f"Failed to execute module {_module_name} from {_file_path}: {exc}") from exc
 
 # ── Aliases for readability ────────────────────────────────────────────
 RunLogger                           = dti.RunLogger
