@@ -1,0 +1,465 @@
+{
+  "scaffold_split_integrity_passed": true,
+  "exact_overlap": {
+    "dataset_index_overlap": [],
+    "canonical_smiles_overlap_count": 0,
+    "scaffold_overlap_count": 0
+  },
+  "near_duplicates": {
+    "threshold": 0.9,
+    "count_at_or_above_threshold": 78,
+    "max_similarity": 1.0,
+    "examples": [
+      {
+        "test_dataset_index": 14,
+        "train_dataset_index": 101,
+        "tanimoto_similarity": 0.9111111111111111,
+        "test_smiles": "CC(C)(C)NC(=O)[C@@H]1CN(S(=O)(=O)c2cccc3cccnc23)CCN1C[C@@H](O)C[C@@H](Cc1ccccc1)C(=O)NC1c2ccccc2C[C@H]1O",
+        "train_smiles": "CC(C)(C)NC(=O)[C@@H]1CN(S(=O)(=O)c2cccc3cccnc23)CCN1C[C@@H](O)C[C@@H](Cc1cccnc1)C(=O)N[C@H]1c2ccccc2C[C@H]1O",
+        "test_scaffold": "O=C(NC1CCc2ccccc21)C(CCCN1CCN(S(=O)(=O)c2cccc3cccnc23)CC1)Cc1ccccc1",
+        "train_scaffold": "O=C(NC1CCc2ccccc21)C(CCCN1CCN(S(=O)(=O)c2cccc3cccnc23)CC1)Cc1cccnc1"
+      },
+      {
+        "test_dataset_index": 149,
+        "train_dataset_index": 156,
+        "tanimoto_similarity": 0.9038461538461539,
+        "test_smiles": "CC(=O)c1cccc(CN2C(=O)N(Cc3cccc(C(C)=O)c3)[C@H](Cc3ccc4c(c3)OCCO4)[C@H](O)[C@@H](O)[C@H]2Cc2ccc3c(c2)OCCO3)c1",
+        "train_smiles": "CC(=O)c1cccc(CN2C(=O)N(Cc3cccc(C(C)=O)c3)[C@H](Cc3ccc4c(c3)OCO4)[C@H](O)[C@@H](O)[C@H]2Cc2ccc3c(c2)OCO3)c1",
+        "test_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccc3c(c2)OCCO3)CCC(Cc2ccc3c(c2)OCCO3)N1Cc1ccccc1",
+        "train_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccc3c(c2)OCO3)CCC(Cc2ccc3c(c2)OCO3)N1Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 178,
+        "train_dataset_index": 279,
+        "tanimoto_similarity": 0.9692307692307692,
+        "test_smiles": "CCC(c1cccc(NS(=O)(=O)c2ccc(C#N)cn2)c1)c1c(O)c2c(oc1=O)CCCC2",
+        "train_smiles": "CCC(c1cccc(NS(=O)(=O)c2ccc(C#N)cn2)c1)c1c(O)c2c(oc1=O)CCC2",
+        "test_scaffold": "O=c1oc2c(cc1Cc1cccc(NS(=O)(=O)c3ccccn3)c1)CCCC2",
+        "train_scaffold": "O=c1oc2c(cc1Cc1cccc(NS(=O)(=O)c3ccccn3)c1)CCC2"
+      },
+      {
+        "test_dataset_index": 256,
+        "train_dataset_index": 3368,
+        "tanimoto_similarity": 0.9787234042553191,
+        "test_smiles": "O=c1cc(-c2ccccc2)oc(O)c1C(CC1CC1)SC1CCCC1",
+        "train_smiles": "O=c1cc(-c2ccccc2)oc(O)c1C(CC1CC1)SC1CCCCC1",
+        "test_scaffold": "O=c1cc(-c2ccccc2)occ1C(CC1CC1)SC1CCCC1",
+        "train_scaffold": "O=c1cc(-c2ccccc2)occ1C(CC1CC1)SC1CCCCC1"
+      },
+      {
+        "test_dataset_index": 269,
+        "train_dataset_index": 600,
+        "tanimoto_similarity": 0.9016393442622951,
+        "test_smiles": "O=C(Nc1ccccc1C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc1ccccc1)NC(=O)c1ccccc1NC(=O)OCc1ccccn1)OCc1ccccn1",
+        "train_smiles": "Cc1ccccc1C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)C[C@H](Cc1ccccc1)NC(=O)c1ccccc1NC(=O)OCc1ccccn1",
+        "test_scaffold": "O=C(Nc1ccccc1C(=O)NC(CCC(Cc1ccccc1)NC(=O)c1ccccc1NC(=O)OCc1ccccn1)Cc1ccccc1)OCc1ccccn1",
+        "train_scaffold": "O=C(Nc1ccccc1C(=O)NC(CCC(Cc1ccccc1)NC(=O)c1ccccc1)Cc1ccccc1)OCc1ccccn1"
+      },
+      {
+        "test_dataset_index": 417,
+        "train_dataset_index": 2378,
+        "tanimoto_similarity": 0.96875,
+        "test_smiles": "CCC(C1=C(O)OC2CCCC2C1=O)c1cccc(NS(=O)(=O)c2ccc(C#N)cc2)c1",
+        "train_smiles": "CCC(C1=C(O)OC2CCCCC2C1=O)c1cccc(NS(=O)(=O)c2ccc(C#N)cc2)c1",
+        "test_scaffold": "O=C1C(Cc2cccc(NS(=O)(=O)c3ccccc3)c2)=COC2CCCC12",
+        "train_scaffold": "O=C1C(Cc2cccc(NS(=O)(=O)c3ccccc3)c2)=COC2CCCCC12"
+      },
+      {
+        "test_dataset_index": 504,
+        "train_dataset_index": 1271,
+        "tanimoto_similarity": 0.922077922077922,
+        "test_smiles": "CN1CCN(CCOc2ccc(C[C@H](C[C@H](O)[C@H](Cc3ccccc3)NC(=O)OC(C)(C)C)C(=O)NC3c4ccccc4C[C@H]3O)cc2)CC1",
+        "train_smiles": "CC(C)(C)OC(=O)N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](Cc1ccc(OCCN2CCCC2)cc1)C(=O)NC1c2ccccc2C[C@H]1O",
+        "test_scaffold": "O=C(NC1CCc2ccccc21)C(CCCCc1ccccc1)Cc1ccc(OCCN2CCNCC2)cc1",
+        "train_scaffold": "O=C(NC1CCc2ccccc21)C(CCCCc1ccccc1)Cc1ccc(OCCN2CCCC2)cc1"
+      },
+      {
+        "test_dataset_index": 527,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 532,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 533,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 536,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 581,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@@H](O)[C@@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 624,
+        "train_dataset_index": 1392,
+        "tanimoto_similarity": 0.9770114942528736,
+        "test_smiles": "CC(C)C[C@@H]1NC(=O)[C@H](C(C)C)NC(=O)[C@]2(C)CCCN2C(=O)[C@H](C(C)C)NC(=O)[C@H](Cc2ccccc2)NC(=O)CSCCNC(=O)[C@H](Cc2ccccc2)N(C)C(=O)[C@H](CC(C)C)NC(=O)[C@H](CCC2CCCCC2)NC1=O",
+        "train_smiles": "CC(C)C[C@@H]1NC(=O)[C@H](C(C)C)NC(=O)[C@]2(C)CCCN2C(=O)[C@H](C(C)C)NC(=O)[C@H](Cc2ccccc2)NC(=O)CSCCNC(=O)[C@H](CC(C)C)NC(=O)[C@H](Cc2ccccc2)N(C)C(=O)[C@H](CC(C)C)NC(=O)[C@H](CCC2CCCCC2)NC1=O",
+        "test_scaffold": "O=C1CNC(=O)C2CCCN2C(=O)CNC(=O)C(Cc2ccccc2)NC(=O)CSCCNC(=O)C(Cc2ccccc2)NC(=O)CNC(=O)C(CCC2CCCCC2)NC(=O)CN1",
+        "train_scaffold": "O=C1CNC(=O)C(Cc2ccccc2)NC(=O)CNC(=O)C(CCC2CCCCC2)NC(=O)CNC(=O)CNC(=O)C2CCCN2C(=O)CNC(=O)C(Cc2ccccc2)NC(=O)CSCCN1"
+      },
+      {
+        "test_dataset_index": 628,
+        "train_dataset_index": 2619,
+        "tanimoto_similarity": 0.9577464788732394,
+        "test_smiles": "CCC[C@@]1(CCc2ccccc2)CC(=O)C([C@@H](CC)c2cccc(NS(=O)(=O)c3cn(C)cn3)c2)=C(O)O1",
+        "train_smiles": "CCC(C1=C(O)OC(CCc2ccccc2)(CCc2ccccc2)CC1=O)c1cccc(NS(=O)(=O)c2cn(C)cn2)c1",
+        "test_scaffold": "O=C1CC(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1",
+        "train_scaffold": "O=C1CC(CCc2ccccc2)(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1"
+      },
+      {
+        "test_dataset_index": 637,
+        "train_dataset_index": 245,
+        "tanimoto_similarity": 0.9468085106382979,
+        "test_smiles": "O=C(N[C@H]1c2ccccc2OC[C@H]1O)[C@H](Cc1ccccc1)C[C@H](O)CN1CCN(Cc2ccc(-c3cccnc3)o2)C[C@H]1C(=O)NCC(F)(F)F",
+        "train_smiles": "O=C(N[C@H]1c2ccccc2OC[C@H]1O)[C@H](Cc1cccnc1)C[C@H](O)CN1CCN(Cc2ccc(-c3ccccc3)o2)C[C@H]1C(=O)NCC(F)(F)F",
+        "test_scaffold": "O=C(NC1CCOc2ccccc21)C(CCCN1CCN(Cc2ccc(-c3cccnc3)o2)CC1)Cc1ccccc1",
+        "train_scaffold": "O=C(NC1CCOc2ccccc21)C(CCCN1CCN(Cc2ccc(-c3ccccc3)o2)CC1)Cc1cccnc1"
+      },
+      {
+        "test_dataset_index": 649,
+        "train_dataset_index": 135,
+        "tanimoto_similarity": 0.9180327868852459,
+        "test_smiles": "CC(C)C[C@@H]1[C@H](O)[C@@H](O)[C@@H](CC(C)C)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "train_smiles": "CC(C)C[C@@H]1[C@H](O)[C@@H](O)[C@@H](Cc2ccccc2)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "test_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCCN(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1",
+        "train_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCC(Cc3ccccc3)N(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1"
+      },
+      {
+        "test_dataset_index": 684,
+        "train_dataset_index": 2619,
+        "tanimoto_similarity": 0.9577464788732394,
+        "test_smiles": "CCC[C@]1(CCc2ccccc2)CC(=O)C([C@@H](CC)c2cccc(NS(=O)(=O)c3cn(C)cn3)c2)=C(O)O1",
+        "train_smiles": "CCC(C1=C(O)OC(CCc2ccccc2)(CCc2ccccc2)CC1=O)c1cccc(NS(=O)(=O)c2cn(C)cn2)c1",
+        "test_scaffold": "O=C1CC(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1",
+        "train_scaffold": "O=C1CC(CCc2ccccc2)(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1"
+      },
+      {
+        "test_dataset_index": 687,
+        "train_dataset_index": 163,
+        "tanimoto_similarity": 0.9230769230769231,
+        "test_smiles": "CCCCCC[C@@H]1[C@H](O)[C@@H](O)[C@@H](CCCCCC)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "train_smiles": "CCCCCC[C@@H]1[C@H](O)[C@@H](O)[C@@H](Cc2ccccc2)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "test_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCCN(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1",
+        "train_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCC(Cc3ccccc3)N(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1"
+      },
+      {
+        "test_dataset_index": 702,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 703,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9761904761904762,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1)Cc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 722,
+        "train_dataset_index": 859,
+        "tanimoto_similarity": 0.9833333333333333,
+        "test_smiles": "CCC[C@H](C[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](C)NC(=O)[C@H](C)NC(=O)OCc1ccccc1)C(=O)N[C@H](C(=O)N[C@H](C(=O)OC)C(C)C)C(C)C",
+        "train_smiles": "CCC[C@H](C[C@H](O)C(Cc1ccccc1)NC(=O)C(C)NC(=O)OCc1ccccc1)C(=O)NC(C(=O)NC(C(=O)OC)C(C)C)C(C)C",
+        "test_scaffold": "O=C(CNC(=O)CNC(=O)OCc1ccccc1)NCCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NCCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 805,
+        "train_dataset_index": 753,
+        "tanimoto_similarity": 0.9322033898305084,
+        "test_smiles": "CC(C)C[C@H](NC(=O)[C@H](Cc1ccccc1)C[C@H](O)[C@H](Cc1ccccc1)NC(=O)OC(C)(C)C)C(=O)N[C@@H](Cc1ccccc1)C(N)=O",
+        "train_smiles": "CC(C)C[C@H](NC(=O)[C@H](Cc1ccc(-c2ccccc2)cc1)C[C@H](O)[C@H](Cc1ccccc1)NC(=O)OC(C)(C)C)C(=O)N[C@@H](Cc1ccccc1)C(N)=O",
+        "test_scaffold": "O=C(CNC(=O)C(CCCCc1ccccc1)Cc1ccccc1)NCCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)C(CCCCc1ccccc1)Cc1ccc(-c2ccccc2)cc1)NCCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 861,
+        "train_dataset_index": 1213,
+        "tanimoto_similarity": 0.9818181818181818,
+        "test_smiles": "COC(=O)[C@@H](NC(=O)[C@@H](NC(=O)[C@H](C)C[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](C)NC(=O)[C@H](C)NC(=O)OCc1ccccc1)C(C)C)C(C)C",
+        "train_smiles": "COC(=O)C(NC(=O)C(NC(=O)[C@H](C)C[C@H](O)C(Cc1ccccc1)NC(=O)C(C)NC(=O)OCc1ccccc1)C(C)C)C(C)C",
+        "test_scaffold": "O=C(CNC(=O)CNC(=O)OCc1ccccc1)NCCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NCCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 892,
+        "train_dataset_index": 1193,
+        "tanimoto_similarity": 0.9056603773584906,
+        "test_smiles": "CC(=O)c1cc(CN2C(=O)N(Cc3ccc(F)c(C(C)=O)c3)[C@H](Cc3ccc4c(c3)OCCO4)[C@H](O)[C@@H](O)[C@H]2Cc2ccc3c(c2)OCCO3)ccc1F",
+        "train_smiles": "CC(=O)c1cc(CN2C(=O)N(Cc3ccc(F)c(C(C)=O)c3)[C@H](Cc3ccc4c(c3)OCO4)[C@H](O)[C@@H](O)[C@H]2Cc2ccc3c(c2)OCO3)ccc1F",
+        "test_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccc3c(c2)OCCO3)CCC(Cc2ccc3c(c2)OCCO3)N1Cc1ccccc1",
+        "train_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccc3c(c2)OCO3)CCC(Cc2ccc3c(c2)OCO3)N1Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 903,
+        "train_dataset_index": 418,
+        "tanimoto_similarity": 0.9560439560439561,
+        "test_smiles": "O=C(N[C@H]1c2ccccc2OC[C@H]1O)[C@H](Cc1ccccc1)C[C@H](O)CN1CCN(Cc2ccc(-c3ccncc3)o2)C[C@H]1C(=O)NCC(F)(F)F",
+        "train_smiles": "O=C(N[C@H]1c2ccccc2OC[C@H]1O)[C@H](Cc1ccncc1)C[C@H](O)CN1CCN(Cc2ccc(-c3ccccc3)o2)C[C@H]1C(=O)NCC(F)(F)F",
+        "test_scaffold": "O=C(NC1CCOc2ccccc21)C(CCCN1CCN(Cc2ccc(-c3ccncc3)o2)CC1)Cc1ccccc1",
+        "train_scaffold": "O=C(NC1CCOc2ccccc21)C(CCCN1CCN(Cc2ccc(-c3ccccc3)o2)CC1)Cc1ccncc1"
+      },
+      {
+        "test_dataset_index": 949,
+        "train_dataset_index": 1260,
+        "tanimoto_similarity": 0.9069767441860465,
+        "test_smiles": "CNC(=O)[C@@H](NC(=O)[C@H](OCc1ccccc1)[C@H](O)[C@@H](O)[C@@H](OCc1ccccc1)C(=O)N[C@H](C(=O)NC)C(C)C)C(C)C",
+        "train_smiles": "CNC(=O)[C@@H](NC(=O)[C@H](OCc1ccc(CCc2ccccc2)cc1)[C@H](O)[C@@H](O)[C@@H](OCc1ccc(CCc2ccccc2)cc1)C(=O)N[C@H](C(=O)NC)C(C)C)C(C)C",
+        "test_scaffold": "c1ccc(COCCCCOCc2ccccc2)cc1",
+        "train_scaffold": "c1ccc(CCc2ccc(COCCCCOCc3ccc(CCc4ccccc4)cc3)cc2)cc1"
+      },
+      {
+        "test_dataset_index": 959,
+        "train_dataset_index": 989,
+        "tanimoto_similarity": 0.9827586206896551,
+        "test_smiles": "COC(=O)[C@@H](NC(=O)[C@@H](NC(=O)[C@H](CC(C)C)C[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](C)NC(=O)[C@H](C)NC(=O)OCc1ccccc1)C(C)C)C(C)C",
+        "train_smiles": "COC(=O)C(NC(=O)C(NC(=O)[C@H](CC(C)C)C[C@H](O)C(Cc1ccccc1)NC(=O)C(C)NC(=O)OCc1ccccc1)C(C)C)C(C)C",
+        "test_scaffold": "O=C(CNC(=O)CNC(=O)OCc1ccccc1)NCCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NCCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1014,
+        "train_dataset_index": 2022,
+        "tanimoto_similarity": 0.9318181818181818,
+        "test_smiles": "CC(C)C[C@@H]1NC(=O)[C@H](C(C)C)NC(=O)[C@@H]2CCCN2C(=O)[C@H](C(C)C)NC(=O)[C@H](Cc2ccccc2)NC(=O)CSCCNC(=O)CNC(=O)[C@H](Cc2ccccc2)N(C)C(=O)[C@H](CC(C)C)NC(=O)[C@H](Cc2c[nH]c3ccccc23)NC1=O",
+        "train_smiles": "CC(C)C[C@@H]1NC(=O)[C@H](C(C)C)NC(=O)[C@@H]2CCCN2C(=O)[C@H](C(C)C)NC(=O)[C@H](Cc2ccccc2)NC(=O)CSCCNC(=O)[C@H](Cc2ccccc2)N(C)C(=O)[C@H](CC(C)C)NC(=O)[C@H](Cc2c[nH]c3ccccc23)NC1=O",
+        "test_scaffold": "O=C1CNC(=O)C(Cc2ccccc2)NC(=O)CNC(=O)C(Cc2c[nH]c3ccccc23)NC(=O)CNC(=O)CNC(=O)C2CCCN2C(=O)CNC(=O)C(Cc2ccccc2)NC(=O)CSCCN1",
+        "train_scaffold": "O=C1CNC(=O)C2CCCN2C(=O)CNC(=O)C(Cc2ccccc2)NC(=O)CSCCNC(=O)C(Cc2ccccc2)NC(=O)CNC(=O)C(Cc2c[nH]c3ccccc23)NC(=O)CN1"
+      },
+      {
+        "test_dataset_index": 1073,
+        "train_dataset_index": 2619,
+        "tanimoto_similarity": 0.9577464788732394,
+        "test_smiles": "CCCC1(CCc2ccccc2)CC(=O)C(C(CC)c2cccc(NS(=O)(=O)c3cn(C)cn3)c2)=C(O)O1",
+        "train_smiles": "CCC(C1=C(O)OC(CCc2ccccc2)(CCc2ccccc2)CC1=O)c1cccc(NS(=O)(=O)c2cn(C)cn2)c1",
+        "test_scaffold": "O=C1CC(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1",
+        "train_scaffold": "O=C1CC(CCc2ccccc2)(CCc2ccccc2)OC=C1Cc1cccc(NS(=O)(=O)c2c[nH]cn2)c1"
+      },
+      {
+        "test_dataset_index": 1105,
+        "train_dataset_index": 899,
+        "tanimoto_similarity": 0.9101123595505618,
+        "test_smiles": "CC[C@H](C)[C@H](NC(=O)C1CCCN1C[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](CC(N)=O)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CO)NC(C)=O)C(=O)N[C@@H](CCc1ccccc1)C(=O)OC",
+        "train_smiles": "CC[C@H](C)[C@H](NC(=O)C1CCCN1C[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](CC(N)=O)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CO)NC(C)=O)C(=O)N[C@@H](Cc1ccccc1)C(=O)OC",
+        "test_scaffold": "O=C(CNC(=O)C1CCCN1CCCCc1ccccc1)NCCCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)C1CCCN1CCCCc1ccccc1)NCCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1336,
+        "train_dataset_index": 769,
+        "tanimoto_similarity": 0.9375,
+        "test_smiles": "CC(C)(C)OC(=O)N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](Cc1ccc(OCCCN2CCOCC2)cc1)C(=O)NC1c2ccccc2C[C@H]1O",
+        "train_smiles": "CC(C)(C)OC(=O)N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](Cc1ccc(OCCN2CCOCC2)cc1)C(=O)N[C@H]1c2ccccc2C[C@H]1O",
+        "test_scaffold": "O=C(NC1CCc2ccccc21)C(CCCCc1ccccc1)Cc1ccc(OCCCN2CCOCC2)cc1",
+        "train_scaffold": "O=C(NC1CCc2ccccc21)C(CCCCc1ccccc1)Cc1ccc(OCCN2CCOCC2)cc1"
+      },
+      {
+        "test_dataset_index": 1359,
+        "train_dataset_index": 1625,
+        "tanimoto_similarity": 0.9577464788732394,
+        "test_smiles": "COc1cc(CN2C(=O)N(Cc3ccc(O)c(OC)c3)N(C(=O)CCCCN3CCOCC3)C[C@@H](O)[C@H]2Cc2ccccc2)ccc1O",
+        "train_smiles": "COc1cc(CN2C(=O)N(Cc3ccc(O)c(OC)c3)N(C(=O)CCCN3CCOCC3)C[C@@H](O)[C@H]2Cc2ccccc2)ccc1O",
+        "test_scaffold": "O=C(CCCCN1CCOCC1)N1CCC(Cc2ccccc2)N(Cc2ccccc2)C(=O)N1Cc1ccccc1",
+        "train_scaffold": "O=C(CCCN1CCOCC1)N1CCC(Cc2ccccc2)N(Cc2ccccc2)C(=O)N1Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1390,
+        "train_dataset_index": 2099,
+        "tanimoto_similarity": 0.9230769230769231,
+        "test_smiles": "O=C1N(Cc2ccccc2)[C@H](Cc2ccccc2)[C@H](O)[C@@H](O)[C@@H](Cc2ccccc2)N1Cc1ccc2ccccc2c1",
+        "train_smiles": "O=C1N(Cc2ccccc2)[C@H](Cc2ccc3ccccc3c2)[C@H](O)[C@@H](O)[C@@H](Cc2ccc3ccccc3c2)N1Cc1ccccc1",
+        "test_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccccc2)CCC(Cc2ccccc2)N1Cc1ccc2ccccc2c1",
+        "train_scaffold": "O=C1N(Cc2ccccc2)C(Cc2ccc3ccccc3c2)CCC(Cc2ccc3ccccc3c2)N1Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1474,
+        "train_dataset_index": 1226,
+        "tanimoto_similarity": 0.9841269841269841,
+        "test_smiles": "COc1ccc(S(=O)(=O)N(C[C@@H](O)[C@H](Cc2ccccc2)NC(=O)OC(C)(C)C)OC2CCCCC2)cc1",
+        "train_smiles": "COc1ccc(S(=O)(=O)N(C[C@@H](O)[C@H](Cc2ccccc2)NC(=O)OC(C)(C)C)OC2CCCC2)cc1",
+        "test_scaffold": "O=S(=O)(c1ccccc1)N(CCCCc1ccccc1)OC1CCCCC1",
+        "train_scaffold": "O=S(=O)(c1ccccc1)N(CCCCc1ccccc1)OC1CCCC1"
+      },
+      {
+        "test_dataset_index": 1527,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9302325581395349,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)C(O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(Cc1ccccc1)CC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1528,
+        "train_dataset_index": 314,
+        "tanimoto_similarity": 0.9230769230769231,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccn1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccn1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccn1)C(C)C",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(Cc1ccccc1)CC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccn1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccn1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccn1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1530,
+        "train_dataset_index": 528,
+        "tanimoto_similarity": 0.9302325581395349,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccc1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)OCc1ccccc1",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(Cc1ccccc1)CC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccc1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(CCC(Cc1ccccc1)NC(=O)OCc1ccccc1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1708,
+        "train_dataset_index": 255,
+        "tanimoto_similarity": 0.9152542372881356,
+        "test_smiles": "CC[C@@H]1[C@H](O)[C@@H](O)[C@@H](CC)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "train_smiles": "CC[C@@H]1[C@H](O)[C@@H](O)[C@@H](Cc2ccccc2)N(Cc2cccc(C(=O)Nc3nc4ccccc4[nH]3)c2)C(=O)N1Cc1cccc(C(=O)Nc2nc3ccccc3[nH]2)c1",
+        "test_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCCN(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1",
+        "train_scaffold": "O=C(Nc1nc2ccccc2[nH]1)c1cccc(CN2CCCC(Cc3ccccc3)N(Cc3cccc(C(=O)Nc4nc5ccccc5[nH]4)c3)C2=O)c1"
+      },
+      {
+        "test_dataset_index": 1730,
+        "train_dataset_index": 314,
+        "tanimoto_similarity": 0.96,
+        "test_smiles": "CC(C)[C@H](NC(=O)OCc1ccccn1)C(=O)N[C@@H](Cc1ccccc1)C(O)[C@H](Cc1ccccc1)NC(=O)[C@H](NC(=O)OCc1ccccn1)C(C)C",
+        "train_smiles": "CC(C)[C@H](NC(=O)OCc1ccccn1)C(=O)N[C@@H](Cc1ccccc1)[C@H](O)[C@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)OCc1ccccn1)C(C)C",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccn1)NC(Cc1ccccc1)CC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccn1",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccn1)NC(CCC(Cc1ccccc1)NC(=O)CNC(=O)OCc1ccccn1)Cc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1837,
+        "train_dataset_index": 2114,
+        "tanimoto_similarity": 0.9210526315789473,
+        "test_smiles": "CC(=O)NCc1ccc(CN[C@@H](C(=O)N[C@H]2c3ccccc3C[C@H]2O)[C@H](O)[C@H](Cc2ccccc2)NC(=O)[C@@H](NC(=O)OCc2ccccc2)C(C)(C)C)cc1",
+        "train_smiles": "CC(C)(C)[C@H](NC(=O)OCc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)[C@@H](NCc1ccc(CNC(=O)OCc2ccccc2)cc1)C(=O)N[C@H]1c2ccccc2C[C@H]1O",
+        "test_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(Cc1ccccc1)CC(NCc1ccccc1)C(=O)NC1CCc2ccccc21",
+        "train_scaffold": "O=C(CNC(=O)OCc1ccccc1)NC(Cc1ccccc1)CC(NCc1ccc(CNC(=O)OCc2ccccc2)cc1)C(=O)NC1CCc2ccccc21"
+      },
+      {
+        "test_dataset_index": 1854,
+        "train_dataset_index": 3061,
+        "tanimoto_similarity": 0.984375,
+        "test_smiles": "O=C(NC(C(=O)NC(Cc1ccc(OCc2ccccc2)cc1)C(=O)C(F)(F)C(=O)NCc1ccccc1)C1CCCC1)OCc1ccccc1",
+        "train_smiles": "O=C(NC(C(=O)NC(Cc1ccc(OCc2ccccc2)cc1)C(=O)C(F)(F)C(=O)NCc1ccccc1)C1CCCCC1)OCc1ccccc1",
+        "test_scaffold": "O=C(CC(=O)C(Cc1ccc(OCc2ccccc2)cc1)NC(=O)C(NC(=O)OCc1ccccc1)C1CCCC1)NCc1ccccc1",
+        "train_scaffold": "O=C(CC(=O)C(Cc1ccc(OCc2ccccc2)cc1)NC(=O)C(NC(=O)OCc1ccccc1)C1CCCCC1)NCc1ccccc1"
+      },
+      {
+        "test_dataset_index": 1950,
+        "train_dataset_index": 2052,
+        "tanimoto_similarity": 0.9620253164556962,
+        "test_smiles": "CC(C)[C@@H]1NC(=O)/C=C\\CCCOc2ccc(cc2)C[C@@H]([C@H](O)CN2CC3CCCCC3C[C@H]2C(=O)NC(C)(C)C)NC1=O",
+        "train_smiles": "CC(C)[C@@H]1NC(=O)/C=C\\CCCCOc2ccc(cc2)C[C@@H]([C@H](O)CN2CC3CCCCC3C[C@H]2C(=O)NC(C)(C)C)NC1=O",
+        "test_scaffold": "O=C1C=CCCCOc2ccc(cc2)CC(CCN2CCC3CCCCC3C2)NC(=O)CN1",
+        "train_scaffold": "O=C1C=CCCCCOc2ccc(cc2)CC(CCN2CCC3CCCCC3C2)NC(=O)CN1"
+      },
+      {
+        "test_dataset_index": 2061,
+        "train_dataset_index": 1281,
+        "tanimoto_similarity": 0.9420289855072463,
+        "test_smiles": "COc1ccc(S(=O)(=O)N(CC2CCCC2)C[C@@H](O)CN2C(=O)C3(CC3)OC[C@@H]2Cc2ccccc2)cc1",
+        "train_smiles": "COc1ccc(S(=O)(=O)N(CC2CCCC2)C[C@@H](O)CN2C(=O)C3(CCCCC3)OC[C@@H]2Cc2ccccc2)cc1",
+        "test_scaffold": "O=C1N(CCCN(CC2CCCC2)S(=O)(=O)c2ccccc2)C(Cc2ccccc2)COC12CC2",
+        "train_scaffold": "O=C1N(CCCN(CC2CCCC2)S(=O)(=O)c2ccccc2)C(Cc2ccccc2)COC12CCCCC2"
+      },
+      {
+        "test_dataset_index": 2075,
+        "train_dataset_index": 3471,
+        "tanimoto_similarity": 0.9264705882352942,
+        "test_smiles": "CC(C)(C)NC(=O)[C@@H]1C[C@@H]2CCCC[C@@H]2CN1C[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@@H]1CCCS(=O)(=O)C1",
+        "train_smiles": "CC(C)(C)NC(=O)[C@@H]1C[C@@H]2CCCC[C@@H]2CN1C[C@@H](O)[C@H](Cc1ccccc1)NC(=O)[C@H]1CCS(=O)(=O)C1",
+        "test_scaffold": "O=C(NC(CCN1CCC2CCCCC2C1)Cc1ccccc1)C1CCCS(=O)(=O)C1",
+        "train_scaffold": "O=C(NC(CCN1CCC2CCCCC2C1)Cc1ccccc1)C1CCS(=O)(=O)C1"
+      },
+      {
+        "test_dataset_index": 2218,
+        "train_dataset_index": 2873,
+        "tanimoto_similarity": 0.9859154929577465,
+        "test_smiles": "O=C(N[C@@H](Cc1ccccc1)[C@H](O)CN(OC1CCCC1)S(=O)(=O)c1ccc(O)cc1)O[C@H]1CO[C@H]2OCC[C@H]21",
+        "train_smiles": "O=C(N[C@@H](Cc1ccccc1)[C@H](O)CN(OC1CCCCC1)S(=O)(=O)c1ccc(O)cc1)O[C@H]1CO[C@H]2OCC[C@H]21",
+        "test_scaffold": "O=C(NC(CCN(OC1CCCC1)S(=O)(=O)c1ccccc1)Cc1ccccc1)OC1COC2OCCC12",
+        "train_scaffold": "O=C(NC(CCN(OC1CCCCC1)S(=O)(=O)c1ccccc1)Cc1ccccc1)OC1COC2OCCC12"
+      },
+      {
+        "test_dataset_index": 2290,
+        "train_dataset_index": 2129,
+        "tanimoto_similarity": 0.9655172413793104,
+        "test_smiles": "CC(C)(C)NC(=O)[C@@H]1CC2CCCCC2CN1C[C@@H](O)[C@@H]1Cc2ccc(cc2)OCCOc2cc3ccccc3cc2C(=O)N[C@@H](CC(N)=O)C(=O)N1",
+        "train_smiles": "CC(C)(C)NC(=O)[C@@H]1CC2CCCCC2CN1C[C@@H](O)[C@@H]1Cc2ccc(cc2)OCCCOc2cc3ccccc3cc2C(=O)N[C@@H](CC(N)=O)C(=O)N1",
+        "test_scaffold": "O=C1CNC(=O)c2cc3ccccc3cc2OCCOc2ccc(cc2)CC(CCN2CCC3CCCCC3C2)N1",
+        "train_scaffold": "O=C1CNC(=O)c2cc3ccccc3cc2OCCCOc2ccc(cc2)CC(CCN2CCC3CCCCC3C2)N1"
+      },
+      {
+        "test_dataset_index": 2306,
+        "train_dataset_index": 2018,
+        "tanimoto_similarity": 1.0,
+        "test_smiles": "CC(C)[C@@H]1NC(=O)[C@@H]([C@H](O)[C@H](Cc2ccccc2)NC(=O)O[C@H]2CCOC2)NCc2ccc(cc2)OCCOCCOCCNC1=O",
+        "train_smiles": "CC(C)[C@@H]1NC(=O)[C@@H]([C@H](O)[C@H](Cc2ccccc2)NC(=O)O[C@H]2CCOC2)NCc2ccc(cc2)OCCOCCNC1=O",
+        "test_scaffold": "O=C1CNC(=O)C(CC(Cc2ccccc2)NC(=O)OC2CCOC2)NCc2ccc(cc2)OCCOCCOCCN1",
+        "train_scaffold": "O=C1CNC(=O)C(CC(Cc2ccccc2)NC(=O)OC2CCOC2)NCc2ccc(cc2)OCCOCCN1"
+      },
+      {
+        "test_dataset_index": 2420,
+        "train_dataset_index": 2177,
+        "tanimoto_similarity": 0.9864864864864865,
+        "test_smiles": "Nc1cccc(S(=O)(=O)N(C[C@@H](O)[C@H](Cc2ccccc2)NC(=O)O[C@H]2CO[C@H]3OCC[C@H]32)OC2CCCC2)c1",
+        "train_smiles": "Nc1cccc(S(=O)(=O)N(C[C@@H](O)[C@H](Cc2ccccc2)NC(=O)O[C@H]2CO[C@H]3OCC[C@H]32)OC2CCCCC2)c1",
+        "test_scaffold": "O=C(NC(CCN(OC1CCCC1)S(=O)(=O)c1ccccc1)Cc1ccccc1)OC1COC2OCCC12",
+        "train_scaffold": "O=C(NC(CCN(OC1CCCCC1)S(=O)(=O)c1ccccc1)Cc1ccccc1)OC1COC2OCCC12"
+      },
+      {
+        "test_dataset_index": 2453,
+        "train_dataset_index": 2017,
+        "tanimoto_similarity": 0.9176470588235294,
+        "test_smiles": "CC[C@H](C)[C@H](NC(=O)[C@H](C(C)C)C(O)[C@H](O)[C@H](CC1CCCCC1)NC(=O)c1ccccc1OCOc1ccccc1)C(=O)NCc1nc2ccccc2[nH]1",
+        "train_smiles": "CCC(C)[C@H](NC(=O)[C@H](C(C)C)[C@@H](O)[C@H](O)[C@H](CC1CCCCC1)NC(=O)c1ccccc1OCCOc1ccccc1)C(=O)NCc1nc2ccccc2[nH]1",
+        "test_scaffold": "O=C(CCCC(CC1CCCCC1)NC(=O)c1ccccc1OCOc1ccccc1)NCC(=O)NCc1nc2ccccc2[nH]1",
+        "train_scaffold": "O=C(CCCC(CC1CCCCC1)NC(=O)c1ccccc1OCCOc1ccccc1)NCC(=O)NCc1nc2ccccc2[nH]1"
+      },
+      {
+        "test_dataset_index": 2497,
+        "train_dataset_index": 2706,
+        "tanimoto_similarity": 0.9733333333333334,
+        "test_smiles": "CC(C)[C@@H]1[C@H](OC(=O)N[C@@H](Cc2ccccc2)[C@H](O)CN2CCN(C3CCC3)C[C@H]2C(=O)NC(C)(C)C)CCS1(=O)=O",
+        "train_smiles": "CC(C)[C@@H]1[C@H](OC(=O)N[C@@H](Cc2ccccc2)[C@H](O)CN2CCN(C3CCCC3)C[C@H]2C(=O)NC(C)(C)C)CCS1(=O)=O",
+        "test_scaffold": "O=C(NC(CCN1CCN(C2CCC2)CC1)Cc1ccccc1)OC1CCS(=O)(=O)C1",
+        "train_scaffold": "O=C(NC(CCN1CCN(C2CCCC2)CC1)Cc1ccccc1)OC1CCS(=O)(=O)C1"
+      }
+    ]
+  }
+}

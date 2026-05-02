@@ -1,0 +1,9 @@
+error_type,inside_applicability_domain,count,mean_probability,mean_pchembl,model
+false_negative,False,2,0.25,7.84,Extra Trees + SMOTE
+false_negative,True,12,0.3779310344827586,7.412916666666667,Extra Trees + SMOTE
+false_positive,False,9,0.7813356786740817,4.96,Extra Trees + SMOTE
+false_positive,True,34,0.8845124132095211,5.075294117647059,Extra Trees + SMOTE
+true_negative,False,16,0.35368286191005877,5.0503124999999995,Extra Trees + SMOTE
+true_negative,True,26,0.17072903992506205,4.795576923076923,Extra Trees + SMOTE
+true_positive,False,50,0.8674854195676032,8.2942,Extra Trees + SMOTE
+true_positive,True,663,0.9647399871274993,8.42659544601096,Extra Trees + SMOTE

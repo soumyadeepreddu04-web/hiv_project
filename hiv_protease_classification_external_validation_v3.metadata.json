@@ -1,0 +1,37 @@
+{
+  "strategy": "scaffold_external",
+  "train_rows": 3246,
+  "test_rows": 812,
+  "train_positive_rate": 0.8964879852125693,
+  "test_positive_rate": 0.895320197044335,
+  "integrity": {
+    "dataset_index_overlap_count": 0,
+    "canonical_smiles_overlap_count": 0,
+    "scaffold_overlap_count": 0
+  },
+  "temporal_supplementary": {
+    "train_max_year": 2003,
+    "test_years": [
+      2004,
+      2005,
+      2006,
+      2007,
+      2008,
+      2009,
+      2010,
+      2011,
+      2012,
+      2013,
+      2014,
+      2016,
+      2017,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ],
+    "train_rows": 3102,
+    "test_rows": 956
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "random_seed": 42,
+  "run_profile": "full",
+  "outer_cv_folds": 3,
+  "inner_cv_folds": 3,
+  "search_iterations": 2,
+  "representation": "ecfp4_plus_descriptors",
+  "representation_selection_mode": "fixed_predefined",
+  "feature_scaling": "pipeline_train_only",
+  "smote_policy": "applied_only_within_training_folds_for_smote_models",
+  "external_strategy": "scaffold_external",
+  "internal_train_path": "C:\\Users\\Kuldeep Singh\\.vscode\\hiv_project\\hiv_protease_classification_nested_train_v3.csv",
+  "external_validation_path": "C:\\Users\\Kuldeep Singh\\.vscode\\hiv_project\\hiv_protease_classification_external_validation_v3.csv"
+}
