@@ -1,2056 +1,72 @@
 from __future__ import annotations
 
-import importlib.util
 import json
-import os
-import subprocess
-import time
 import traceback
-import urllib.error
-import urllib.parse
-import urllib.request
-from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
-from joblib import Parallel, delayed
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-from rdkit import Chem, DataStructs
-from rdkit.Chem import Crippen, Descriptors, Lipinski, MACCSkeys, rdFingerprintGenerator, rdMolDescriptors
-from rdkit.Chem.MolStandardize import rdMolStandardize
-from rdkit.Chem.Scaffolds import MurckoScaffold
-from scipy.stats import loguniform, randint
-from sklearn.base import clone
-import matplotlib.pyplot as plt
-from sklearn.ensemble import (
-    ExtraTreesClassifier,
-    ExtraTreesRegressor,
-    HistGradientBoostingClassifier,
-    HistGradientBoostingRegressor,
-    RandomForestClassifier,
-    RandomForestRegressor,
+
+from dti_pipeline.config import (
+    CLASSIFICATION_BEST_PARAMS_PATH,
+    CLASSIFICATION_CONFIG_PATH,
+    CLASSIFICATION_CV_RESULTS_PATH,
+    CLASSIFICATION_EXTERNAL_PATH,
+    CLASSIFICATION_INTERNAL_TRAIN_PATH,
+    CLASSIFICATION_LEAKAGE_REPORT_PATH,
+    CLASSIFICATION_METRICS_PATH,
+    CLASSIFICATION_NESTED_PREDICTIONS_PATH,
+    CLASSIFICATION_PREDICTIONS_PATH,
+    CLASSIFICATION_REPRESENTATION,
+    CLASSIFICATION_TUNING_RESULTS_PATH,
+    FEATURE_BENCHMARK_PATH,
+    OUTER_CV_FOLDS,
+    INNER_CV_FOLDS,
+    CLASSIFICATION_SEARCH_ITERATIONS,
+    RANDOM_SEED,
+    ROC_PLOT_PATH,
+    PR_PLOT_PATH,
+    IMPORTANCE_PLOT_PATH,
+    ACTIVITY_CLIFF_PATH,
+    RUN_LOG_PATH,
+    RUN_PROFILE,
+    RUN_REPORT_PATH,
+    ClassificationResult,
+    RunLogger,
+    write_json,
 )
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    f1_score,
-    make_scorer,
-    matthews_corrcoef,
-    mean_absolute_error,
-    mean_squared_error,
-    precision_recall_curve,
-    precision_score,
-    r2_score,
-    recall_score,
-    roc_auc_score,
-    roc_curve,
+from dti_pipeline.data import (
+    build_classification_dataset,
+    build_classification_splits,
+    build_regression_dataset,
+    build_temporal_split,
+    load_or_build_dataset,
+    scaffold_groups,
+    split_classification_dataset,
 )
-from sklearn.model_selection import GroupKFold, GroupShuffleSplit, RandomizedSearchCV, StratifiedGroupKFold
-from sklearn.neighbors import NearestNeighbors
-from sklearn.utils.class_weight import compute_sample_weight
-
-
-def env_int(name: str, default: int, minimum: int = 1) -> int:
-    raw_value = os.environ.get(name)
-    if raw_value is None:
-        return default
-    try:
-        return max(minimum, int(raw_value))
-    except ValueError:
-        return default
-
-
-RUN_PROFILE = os.environ.get("DTI_PROFILE", "full").strip().lower()
-IS_FAST_PROFILE = RUN_PROFILE == "fast"
-
-RANDOM_SEED = 42
-TEST_SIZE = 0.20
-CHEMBL_TARGET_IDS = ("CHEMBL243",)
-STANDARD_TYPES = ("IC50", "Ki")
-STANDARD_UNITS = "nM"
-ACTIVE_PCHEMBL_THRESHOLD = 6.5
-INACTIVE_PCHEMBL_THRESHOLD = 5.5
-MAX_PCHEMBL_SPREAD = 2.0
-REQUEST_SLEEP_SECONDS = 0.05
-REQUEST_MAX_RETRIES = 4
-PAGE_SIZE = 500
-MOLECULE_BATCH_SIZE = 20
-DOCUMENT_BATCH_SIZE = 50
-MIN_CACHED_SMILES_FOR_OFFLINE_BUILD = 3000
-DATASET_VERSION = "v3"
-CLASSIFICATION_CV_FOLDS = env_int("DTI_CLASSIFICATION_CV_FOLDS", 3 if IS_FAST_PROFILE else 5)
-REGRESSION_CV_FOLDS = env_int("DTI_REGRESSION_CV_FOLDS", 3 if IS_FAST_PROFILE else 5)
-CLASSIFICATION_SEARCH_ITERATIONS = env_int("DTI_CLASSIFICATION_SEARCH_ITERATIONS", 3 if IS_FAST_PROFILE else 6)
-REGRESSION_SEARCH_ITERATIONS = env_int("DTI_REGRESSION_SEARCH_ITERATIONS", 3 if IS_FAST_PROFILE else 6)
-FEATURE_BENCHMARK_TREES = env_int("DTI_FEATURE_BENCHMARK_TREES", 64 if IS_FAST_PROFILE else 160)
-TOP_FEATURES_TO_PLOT = 25
-AD_SIMILARITY_PERCENTILE = 5
-SMOTE_K_NEIGHBORS = 5
-ACTIVITY_CLIFF_SIMILARITY = 0.90
-ACTIVITY_CLIFF_DELTA_PCHEMBL = 1.50
-MAX_PARALLEL_WORKERS = env_int("DTI_N_JOBS", 1)
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-RAW_CACHE_PATH = SCRIPT_DIR / "hiv_protease_chembl_raw.csv"
-DATASET_CACHE_PATH = SCRIPT_DIR / f"hiv_protease_chembl_dataset_{DATASET_VERSION}.csv"
-CLASSIFICATION_TRAIN_PATH = SCRIPT_DIR / f"hiv_protease_classification_train_{DATASET_VERSION}.csv"
-CLASSIFICATION_TEST_PATH = SCRIPT_DIR / f"hiv_protease_classification_test_{DATASET_VERSION}.csv"
-REGRESSION_TRAIN_PATH = SCRIPT_DIR / f"hiv_protease_regression_train_{DATASET_VERSION}.csv"
-REGRESSION_TEST_PATH = SCRIPT_DIR / f"hiv_protease_regression_test_{DATASET_VERSION}.csv"
-TEMPORAL_CLASSIFICATION_TRAIN_PATH = SCRIPT_DIR / f"hiv_protease_classification_temporal_train_{DATASET_VERSION}.csv"
-TEMPORAL_CLASSIFICATION_TEST_PATH = SCRIPT_DIR / f"hiv_protease_classification_temporal_test_{DATASET_VERSION}.csv"
-TEMPORAL_REGRESSION_TRAIN_PATH = SCRIPT_DIR / f"hiv_protease_regression_temporal_train_{DATASET_VERSION}.csv"
-TEMPORAL_REGRESSION_TEST_PATH = SCRIPT_DIR / f"hiv_protease_regression_temporal_test_{DATASET_VERSION}.csv"
-SMILES_CACHE_PATH = SCRIPT_DIR / f"hiv_protease_smiles_{DATASET_VERSION}.csv"
-DOCUMENT_CACHE_PATH = SCRIPT_DIR / f"hiv_protease_documents_{DATASET_VERSION}.csv"
-ROC_PLOT_PATH = SCRIPT_DIR / "roc_curve.png"
-PR_PLOT_PATH = SCRIPT_DIR / "precision_recall_curve.png"
-IMPORTANCE_PLOT_PATH = SCRIPT_DIR / "feature_importance.png"
-REGRESSION_PLOT_PATH = SCRIPT_DIR / "regression_predictions.png"
-FEATURE_BENCHMARK_PATH = SCRIPT_DIR / f"feature_benchmarks_{DATASET_VERSION}.csv"
-CLASSIFICATION_METRICS_PATH = SCRIPT_DIR / f"classification_metrics_{DATASET_VERSION}.csv"
-CLASSIFICATION_CV_RESULTS_PATH = SCRIPT_DIR / f"classification_cv_results_{DATASET_VERSION}.csv"
-CLASSIFICATION_PREDICTIONS_PATH = SCRIPT_DIR / f"classification_predictions_{DATASET_VERSION}.csv"
-REGRESSION_METRICS_PATH = SCRIPT_DIR / f"regression_metrics_{DATASET_VERSION}.csv"
-REGRESSION_CV_RESULTS_PATH = SCRIPT_DIR / f"regression_cv_results_{DATASET_VERSION}.csv"
-REGRESSION_PREDICTIONS_PATH = SCRIPT_DIR / f"regression_predictions_{DATASET_VERSION}.csv"
-CLASSIFICATION_BEST_PARAMS_PATH = SCRIPT_DIR / f"classification_best_params_{DATASET_VERSION}.json"
-REGRESSION_BEST_PARAMS_PATH = SCRIPT_DIR / f"regression_best_params_{DATASET_VERSION}.json"
-ACTIVITY_CLIFF_PATH = SCRIPT_DIR / f"activity_cliffs_{DATASET_VERSION}.csv"
-RUN_REPORT_PATH = SCRIPT_DIR / f"pipeline_report_{DATASET_VERSION}.json"
-RUN_LOG_PATH = SCRIPT_DIR / f"pipeline_run_{DATASET_VERSION}.log"
-
-CHEMBL_BASE_URL = "https://www.ebi.ac.uk/chembl/api/data"
-MORGAN_BITS = 2048
-ATOM_PAIR_BITS = 2048
-TORSION_BITS = 2048
-MORGAN_GENERATOR = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=MORGAN_BITS)
-ATOM_PAIR_GENERATOR = rdFingerprintGenerator.GetAtomPairGenerator(fpSize=ATOM_PAIR_BITS)
-TORSION_GENERATOR = rdFingerprintGenerator.GetTopologicalTorsionGenerator(fpSize=TORSION_BITS)
-UNCHARGER = rdMolStandardize.Uncharger()
-
-DESCRIPTOR_FUNCTIONS: Mapping[str, Any] = {
-    "mol_wt": Descriptors.MolWt,
-    "logp": Crippen.MolLogP,
-    "mol_mr": Crippen.MolMR,
-    "tpsa": rdMolDescriptors.CalcTPSA,
-    "hbond_donors": Lipinski.NumHDonors,
-    "hbond_acceptors": Lipinski.NumHAcceptors,
-    "rotatable_bonds": Lipinski.NumRotatableBonds,
-    "heavy_atoms": Lipinski.HeavyAtomCount,
-    "hetero_atoms": Descriptors.NumHeteroatoms,
-    "fraction_csp3": rdMolDescriptors.CalcFractionCSP3,
-    "ring_count": rdMolDescriptors.CalcNumRings,
-    "aromatic_rings": rdMolDescriptors.CalcNumAromaticRings,
-    "aliphatic_rings": rdMolDescriptors.CalcNumAliphaticRings,
-    "valence_electrons": Descriptors.NumValenceElectrons,
-}
-
-FEATURE_RECIPES: Mapping[str, Sequence[str]] = {
-    "morgan_2048": ("morgan_2048",),
-    "descriptors": ("descriptors",),
-    "morgan_plus_descriptors": ("morgan_2048", "descriptors"),
-    "maccs_plus_descriptors": ("maccs", "descriptors"),
-    "atom_pair_torsion_plus_descriptors": ("atom_pair_2048", "torsion_2048", "descriptors"),
-    "all_fingerprints_plus_descriptors": ("morgan_2048", "maccs", "atom_pair_2048", "torsion_2048", "descriptors"),
-}
-
-if IS_FAST_PROFILE:
-    BENCHMARK_REPRESENTATIONS = (
-        "descriptors",
-        "morgan_plus_descriptors",
-        "maccs_plus_descriptors",
-    )
-else:
-    BENCHMARK_REPRESENTATIONS = tuple(FEATURE_RECIPES.keys())
-
-
-@dataclass
-class RuntimeInfo:
-    backend: str
-    adapters: List[str]
-    gpu_name: str
-    message: str
-
-
-@dataclass
-class ClassificationResult:
-    name: str
-    split: str
-    accuracy: float
-    roc_auc: float
-    pr_auc: float
-    precision: float
-    recall: float
-    f1: float
-    mcc: float
-    y_prob: np.ndarray
-    y_pred: np.ndarray
-
-
-@dataclass
-class RegressionResult:
-    name: str
-    split: str
-    rmse: float
-    mae: float
-    r2: float
-    y_pred: np.ndarray
-
-
-@dataclass
-class FeatureBlocks:
-    arrays: Dict[str, np.ndarray]
-    names: Dict[str, List[str]]
-    morgan_fingerprints: List[Any]
-
-
-class RunLogger:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.start = time.perf_counter()
-        self.path.write_text("", encoding="utf-8")
-        self.log("Pipeline run started.")
-
-    def log(self, message: str) -> None:
-        elapsed = time.perf_counter() - self.start
-        line = f"[{elapsed:8.1f}s] {message}"
-        print(line, flush=True)
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
-
-    @contextmanager
-    def section(self, title: str) -> Iterable[None]:
-        section_start = time.perf_counter()
-        self.log(f"{title}...")
-        try:
-            yield
-        except Exception as error:
-            self.log(f"{title} failed: {error.__class__.__name__}: {error}")
-            raise
-        finally:
-            duration = time.perf_counter() - section_start
-            self.log(f"{title} finished in {duration:.1f}s.")
-
-
-def module_available(module_name: str) -> bool:
-    return importlib.util.find_spec(module_name) is not None
-
-
-def fetch_json(url: str, logger: RunLogger | None = None) -> Dict[str, Any]:
-    last_error: Exception | None = None
-
-    for attempt in range(REQUEST_MAX_RETRIES):
-        request = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; hiv-protease-dti/3.0)",
-                "Accept": "application/json",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                return json.load(response)
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            last_error = error
-            if logger is not None:
-                logger.log(f"Request retry {attempt + 1}/{REQUEST_MAX_RETRIES} failed for {url}: {error}")
-            if attempt == REQUEST_MAX_RETRIES - 1:
-                break
-            time.sleep(1.5 * (attempt + 1))
-
-    raise RuntimeError(f"Failed to fetch ChEMBL URL after retries: {url}") from last_error
-
-
-def build_activity_query_url(target_id: str, standard_type: str) -> str:
-    params = {
-        "target_chembl_id": target_id,
-        "standard_type": standard_type,
-        "standard_units": STANDARD_UNITS,
-        "limit": PAGE_SIZE,
-    }
-    return f"{CHEMBL_BASE_URL}/activity.json?{urllib.parse.urlencode(params)}"
-
-
-def paginate_chembl_records(start_url: str, list_key: str, logger: RunLogger | None = None) -> List[Dict[str, Any]]:
-    records: List[Dict[str, Any]] = []
-    url = start_url
-    page_number = 0
-
-    while url:
-        payload = fetch_json(url, logger=logger)
-        page_records = payload[list_key]
-        records.extend(page_records)
-        page_number += 1
-        if logger is not None:
-            logger.log(f"Fetched page {page_number} with {len(page_records)} {list_key}; running total = {len(records)}")
-        next_page = payload["page_meta"]["next"]
-        url = f"https://www.ebi.ac.uk{next_page}" if next_page else None
-        time.sleep(REQUEST_SLEEP_SECONDS)
-
-    return records
-
-
-def download_raw_activities(logger: RunLogger) -> pd.DataFrame:
-    records: List[Dict[str, Any]] = []
-
-    for target_id in CHEMBL_TARGET_IDS:
-        for standard_type in STANDARD_TYPES:
-            logger.log(f"Downloading raw activities for target={target_id}, standard_type={standard_type}")
-            url = build_activity_query_url(target_id, standard_type)
-            records.extend(paginate_chembl_records(url, list_key="activities", logger=logger))
-
-    raw_df = pd.DataFrame(records)
-    desired_columns = [
-        "activity_id",
-        "assay_chembl_id",
-        "molecule_chembl_id",
-        "standard_type",
-        "standard_relation",
-        "standard_value",
-        "standard_units",
-        "pchembl_value",
-        "target_chembl_id",
-        "document_chembl_id",
-        "activity_comment",
-        "data_validity_comment",
-        "data_validity_description",
-        "potential_duplicate",
-    ]
-    keep_columns = [column for column in desired_columns if column in raw_df.columns]
-    return raw_df[keep_columns].copy()
-
-
-def load_or_download_raw_activities(logger: RunLogger) -> Tuple[pd.DataFrame, bool]:
-    if RAW_CACHE_PATH.exists():
-        logger.log(f"Loading cached raw activity table from {RAW_CACHE_PATH.name}")
-        return pd.read_csv(RAW_CACHE_PATH), False
-
-    with logger.section("Downloading raw ChEMBL activity table"):
-        raw_df = download_raw_activities(logger)
-    raw_df.to_csv(RAW_CACHE_PATH, index=False)
-    return raw_df, True
-
-
-def chunked(items: Sequence[str], chunk_size: int) -> Iterable[Sequence[str]]:
-    for start in range(0, len(items), chunk_size):
-        yield items[start : start + chunk_size]
-
-
-def load_smiles_cache() -> Dict[str, str]:
-    smiles_map: Dict[str, str] = {}
-    candidate_paths = [
-        SMILES_CACHE_PATH,
-        SCRIPT_DIR / "hiv_protease_smiles_v2.csv",
-        SCRIPT_DIR / "hiv_protease_chembl_dataset_v2.csv",
-        SCRIPT_DIR / "hiv_protease_train_v2.csv",
-        SCRIPT_DIR / "hiv_protease_test_v2.csv",
-        SCRIPT_DIR / "hiv_protease_chembl_dataset.csv",
-        SCRIPT_DIR / "hiv_protease_train.csv",
-        SCRIPT_DIR / "hiv_protease_test.csv",
-    ]
-
-    for path in candidate_paths:
-        if not path.exists():
-            continue
-        cache_df = pd.read_csv(path)
-        if {"molecule_chembl_id", "smiles"}.issubset(cache_df.columns):
-            partial_map = dict(zip(cache_df["molecule_chembl_id"].astype(str), cache_df["smiles"].astype(str)))
-            smiles_map.update(partial_map)
-
-    return smiles_map
-
-
-def save_smiles_cache(smiles_map: Dict[str, str]) -> None:
-    cache_df = pd.DataFrame(
-        {
-            "molecule_chembl_id": list(smiles_map.keys()),
-            "smiles": list(smiles_map.values()),
-        }
-    ).sort_values("molecule_chembl_id")
-    cache_df.to_csv(SMILES_CACHE_PATH, index=False)
-
-
-def fetch_smiles_batch(batch: Sequence[str], logger: RunLogger | None = None) -> Dict[str, str]:
-    params = {"molecule_chembl_id__in": ",".join(batch), "limit": len(batch)}
-    url = f"{CHEMBL_BASE_URL}/molecule.json?{urllib.parse.urlencode(params)}"
-
-    try:
-        payload = fetch_json(url, logger=logger)
-    except RuntimeError:
-        if len(batch) == 1:
-            return {}
-        midpoint = len(batch) // 2
-        left_map = fetch_smiles_batch(batch[:midpoint], logger=logger)
-        right_map = fetch_smiles_batch(batch[midpoint:], logger=logger)
-        return {**left_map, **right_map}
-
-    batch_map: Dict[str, str] = {}
-    for molecule in payload["molecules"]:
-        molecule_id = molecule.get("molecule_chembl_id")
-        structures = molecule.get("molecule_structures") or {}
-        smiles = structures.get("canonical_smiles")
-        if molecule_id and smiles:
-            batch_map[str(molecule_id)] = str(smiles)
-    return batch_map
-
-
-def fetch_smiles_map(molecule_ids: Sequence[str], logger: RunLogger) -> Dict[str, str]:
-    smiles_map = load_smiles_cache()
-    missing_ids = [molecule_id for molecule_id in molecule_ids if molecule_id not in smiles_map]
-    logger.log(
-        f"SMILES cache contains {len(smiles_map)} entries; need {len(missing_ids)} additional molecules for this build."
-    )
-
-    if not missing_ids:
-        return smiles_map
-
-    if len(smiles_map) >= MIN_CACHED_SMILES_FOR_OFFLINE_BUILD:
-        logger.log("Large local SMILES cache detected. Proceeding with cached structures and dropping any unresolved tail.")
-        return smiles_map
-
-    for batch_number, batch in enumerate(chunked(list(missing_ids), MOLECULE_BATCH_SIZE), start=1):
-        smiles_map.update(fetch_smiles_batch(batch, logger=logger))
-        save_smiles_cache(smiles_map)
-        logger.log(f"Fetched SMILES batch {batch_number}; cache now holds {len(smiles_map)} molecules.")
-        time.sleep(REQUEST_SLEEP_SECONDS)
-
-    return smiles_map
-
-
-def load_document_cache() -> Dict[str, Dict[str, Any]]:
-    if not DOCUMENT_CACHE_PATH.exists():
-        return {}
-
-    cached = pd.read_csv(DOCUMENT_CACHE_PATH)
-    if "document_chembl_id" not in cached.columns:
-        return {}
-
-    records: Dict[str, Dict[str, Any]] = {}
-    for _, row in cached.iterrows():
-        records[str(row["document_chembl_id"])] = {
-            "year": row.get("year", np.nan),
-            "journal": row.get("journal", ""),
-            "title": row.get("title", ""),
-        }
-    return records
-
-
-def save_document_cache(document_map: Dict[str, Dict[str, Any]]) -> None:
-    rows = []
-    for document_id, metadata in document_map.items():
-        rows.append(
-            {
-                "document_chembl_id": document_id,
-                "year": metadata.get("year", np.nan),
-                "journal": metadata.get("journal", ""),
-                "title": metadata.get("title", ""),
-            }
-        )
-    pd.DataFrame(rows).sort_values("document_chembl_id").to_csv(DOCUMENT_CACHE_PATH, index=False)
-
-
-def fetch_document_batch(batch: Sequence[str], logger: RunLogger | None = None) -> Dict[str, Dict[str, Any]]:
-    params = {"document_chembl_id__in": ",".join(batch), "limit": len(batch)}
-    url = f"{CHEMBL_BASE_URL}/document.json?{urllib.parse.urlencode(params)}"
-
-    try:
-        payload = fetch_json(url, logger=logger)
-    except RuntimeError:
-        if len(batch) == 1:
-            return {}
-        midpoint = len(batch) // 2
-        left = fetch_document_batch(batch[:midpoint], logger=logger)
-        right = fetch_document_batch(batch[midpoint:], logger=logger)
-        return {**left, **right}
-
-    document_map: Dict[str, Dict[str, Any]] = {}
-    for document in payload.get("documents", []):
-        document_id = document.get("document_chembl_id")
-        if not document_id:
-            continue
-        document_map[str(document_id)] = {
-            "year": document.get("year", np.nan),
-            "journal": document.get("journal", ""),
-            "title": document.get("title", ""),
-        }
-    return document_map
-
-
-def fetch_document_metadata(document_ids: Sequence[str], logger: RunLogger, allow_network: bool) -> Dict[str, Dict[str, Any]]:
-    document_map = load_document_cache()
-    missing_ids = [document_id for document_id in document_ids if document_id not in document_map]
-    logger.log(
-        f"Document cache contains {len(document_map)} entries; need metadata for {len(missing_ids)} additional documents."
-    )
-
-    if not missing_ids:
-        return document_map
-
-    if not allow_network:
-        logger.log("Skipping document year fetch because this run is operating from local cache only.")
-        return document_map
-
-    for batch_number, batch in enumerate(chunked(list(missing_ids), DOCUMENT_BATCH_SIZE), start=1):
-        document_map.update(fetch_document_batch(batch, logger=logger))
-        save_document_cache(document_map)
-        logger.log(f"Fetched document batch {batch_number}; cache now holds {len(document_map)} document records.")
-        time.sleep(REQUEST_SLEEP_SECONDS)
-
-    return document_map
-
-
-def standardize_smiles(smiles: str) -> str:
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        raise ValueError(f"Invalid SMILES: {smiles}")
-    mol = rdMolStandardize.Cleanup(mol)
-    mol = rdMolStandardize.FragmentParent(mol)
-    mol = UNCHARGER.uncharge(mol)
-    return Chem.MolToSmiles(mol, canonical=True)
-
-
-def safe_standardize_smiles(smiles: str) -> str | None:
-    try:
-        return standardize_smiles(smiles)
-    except ValueError:
-        return None
-
-
-def label_from_pchembl(median_pchembl: float) -> float:
-    if median_pchembl >= ACTIVE_PCHEMBL_THRESHOLD:
-        return 1.0
-    if median_pchembl <= INACTIVE_PCHEMBL_THRESHOLD:
-        return 0.0
-    return np.nan
-
-
-def scaffold_from_smiles(smiles: str) -> str:
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return smiles
-    scaffold = MurckoScaffold.MurckoScaffoldSmiles(mol=mol)
-    return scaffold if scaffold else smiles
-
-
-def clean_activity_table(raw_df: pd.DataFrame, logger: RunLogger) -> pd.DataFrame:
-    cleaned = raw_df.copy()
-    logger.log(f"Cleaning raw activity table with {len(cleaned)} rows.")
-    cleaned["standard_value_nM"] = pd.to_numeric(cleaned["standard_value"], errors="coerce")
-    cleaned["pchembl_value"] = pd.to_numeric(cleaned["pchembl_value"], errors="coerce")
-    cleaned["potential_duplicate"] = pd.to_numeric(cleaned.get("potential_duplicate"), errors="coerce")
-
-    cleaned = cleaned.dropna(subset=["molecule_chembl_id", "standard_value_nM"])
-    logger.log(f"After dropping missing molecule/value rows: {len(cleaned)} rows")
-
-    cleaned = cleaned[cleaned["standard_units"] == STANDARD_UNITS]
-    cleaned = cleaned[np.isfinite(cleaned["standard_value_nM"])]
-    cleaned = cleaned[cleaned["standard_value_nM"] > 0]
-    logger.log(f"After standard-unit and positive-value filters: {len(cleaned)} rows")
-
-    cleaned["standard_relation"] = cleaned["standard_relation"].fillna("=")
-    cleaned = cleaned[cleaned["standard_relation"] == "="]
-    logger.log(f"After exact-measurement filter: {len(cleaned)} rows")
-
-    if "data_validity_comment" in cleaned.columns:
-        cleaned = cleaned[cleaned["data_validity_comment"].isna()]
-        logger.log(f"After invalid-data filter: {len(cleaned)} rows")
-
-    if "potential_duplicate" in cleaned.columns:
-        cleaned = cleaned[(cleaned["potential_duplicate"].isna()) | (cleaned["potential_duplicate"] == 0)]
-        logger.log(f"After duplicate filter: {len(cleaned)} rows")
-
-    cleaned["resolved_pchembl"] = cleaned["pchembl_value"]
-    missing_mask = ~np.isfinite(cleaned["resolved_pchembl"])
-    cleaned.loc[missing_mask, "resolved_pchembl"] = 9.0 - np.log10(cleaned.loc[missing_mask, "standard_value_nM"])
-    cleaned = cleaned[np.isfinite(cleaned["resolved_pchembl"])]
-    logger.log(f"After pChEMBL resolution: {len(cleaned)} rows")
-    return cleaned.reset_index(drop=True)
-
-
-def build_curated_dataset(raw_df: pd.DataFrame, logger: RunLogger, allow_document_fetch: bool) -> pd.DataFrame:
-    cleaned = clean_activity_table(raw_df, logger)
-    cleaned["document_year"] = np.nan
-
-    if "document_chembl_id" in cleaned.columns:
-        document_ids = sorted(cleaned["document_chembl_id"].dropna().astype(str).unique())
-        document_map = fetch_document_metadata(document_ids, logger, allow_network=allow_document_fetch)
-        if document_map:
-            cleaned["document_year"] = cleaned["document_chembl_id"].astype(str).map(
-                lambda document_id: document_map.get(document_id, {}).get("year", np.nan)
-            )
-            cleaned["document_year"] = pd.to_numeric(cleaned["document_year"], errors="coerce")
-            logger.log(
-                f"Attached document years for {cleaned['document_year'].notna().sum()} activity rows across "
-                f"{cleaned['document_year'].dropna().nunique()} publication years."
-            )
-
-    per_molecule = (
-        cleaned.groupby("molecule_chembl_id")
-        .agg(
-            median_activity_nM=("standard_value_nM", "median"),
-            min_activity_nM=("standard_value_nM", "min"),
-            max_activity_nM=("standard_value_nM", "max"),
-            median_pchembl=("resolved_pchembl", "median"),
-            min_pchembl=("resolved_pchembl", "min"),
-            max_pchembl=("resolved_pchembl", "max"),
-            pchembl_std=("resolved_pchembl", "std"),
-            measurement_count=("activity_id", "size"),
-            assay_count=("assay_chembl_id", "nunique"),
-            document_count=("document_chembl_id", "nunique"),
-            first_document_year=("document_year", "min"),
-            latest_document_year=("document_year", "max"),
-        )
-        .reset_index(drop=False)
-    )
-
-    per_molecule["pchembl_std"] = per_molecule["pchembl_std"].fillna(0.0)
-    per_molecule["label"] = per_molecule["median_pchembl"].apply(label_from_pchembl)
-    has_label_conflict = (per_molecule["max_pchembl"] >= ACTIVE_PCHEMBL_THRESHOLD) & (
-        per_molecule["min_pchembl"] <= INACTIVE_PCHEMBL_THRESHOLD
-    )
-    per_molecule = per_molecule[~has_label_conflict].copy()
-    per_molecule = per_molecule[per_molecule["pchembl_std"] <= MAX_PCHEMBL_SPREAD].copy()
-    logger.log(f"After molecule-level conflict and spread filtering: {len(per_molecule)} unique molecules remain")
-
-    molecule_ids = sorted(per_molecule["molecule_chembl_id"].astype(str).unique())
-    smiles_map = fetch_smiles_map(molecule_ids, logger)
-    per_molecule["smiles"] = per_molecule["molecule_chembl_id"].astype(str).map(smiles_map)
-    per_molecule = per_molecule.dropna(subset=["smiles"]).copy()
-    per_molecule["canonical_smiles"] = per_molecule["smiles"].apply(safe_standardize_smiles)
-    per_molecule = per_molecule.dropna(subset=["canonical_smiles"]).copy()
-    logger.log(f"After SMILES resolution and standardization: {len(per_molecule)} molecules remain")
-
-    grouped = (
-        per_molecule.groupby("canonical_smiles")
-        .agg(
-            median_activity_nM=("median_activity_nM", "median"),
-            min_activity_nM=("min_activity_nM", "min"),
-            max_activity_nM=("max_activity_nM", "max"),
-            median_pchembl=("median_pchembl", "median"),
-            min_pchembl=("min_pchembl", "min"),
-            max_pchembl=("max_pchembl", "max"),
-            pchembl_std=("pchembl_std", "median"),
-            measurement_count=("measurement_count", "sum"),
-            assay_count=("assay_count", "sum"),
-            document_count=("document_count", "sum"),
-            molecule_count=("molecule_chembl_id", "nunique"),
-            molecule_chembl_id=("molecule_chembl_id", "first"),
-            smiles=("canonical_smiles", "first"),
-            first_document_year=("first_document_year", "min"),
-            latest_document_year=("latest_document_year", "max"),
-        )
-        .reset_index(drop=False)
-    )
-
-    grouped = grouped[
-        ~(
-            (grouped["max_pchembl"] >= ACTIVE_PCHEMBL_THRESHOLD)
-            & (grouped["min_pchembl"] <= INACTIVE_PCHEMBL_THRESHOLD)
-        )
-    ].copy()
-    grouped["label"] = grouped["median_pchembl"].apply(label_from_pchembl)
-    grouped["compound_name"] = grouped["molecule_chembl_id"]
-    grouped["scaffold"] = grouped["canonical_smiles"].apply(scaffold_from_smiles)
-    grouped = grouped.sort_values("median_pchembl", ascending=False).reset_index(drop=True)
-    grouped["dataset_index"] = np.arange(len(grouped), dtype=int)
-    return grouped[
-        [
-            "dataset_index",
-            "compound_name",
-            "molecule_chembl_id",
-            "canonical_smiles",
-            "smiles",
-            "scaffold",
-            "median_activity_nM",
-            "min_activity_nM",
-            "max_activity_nM",
-            "median_pchembl",
-            "min_pchembl",
-            "max_pchembl",
-            "pchembl_std",
-            "measurement_count",
-            "assay_count",
-            "document_count",
-            "molecule_count",
-            "first_document_year",
-            "latest_document_year",
-            "label",
-        ]
-    ]
-
-
-def load_or_build_dataset(logger: RunLogger) -> pd.DataFrame:
-    if DATASET_CACHE_PATH.exists():
-        logger.log(f"Loading cached curated dataset from {DATASET_CACHE_PATH.name}")
-        dataset_df = pd.read_csv(DATASET_CACHE_PATH)
-    else:
-        raw_df, downloaded_raw = load_or_download_raw_activities(logger)
-        with logger.section("Building curated molecular dataset"):
-            dataset_df = build_curated_dataset(raw_df, logger, allow_document_fetch=downloaded_raw or DOCUMENT_CACHE_PATH.exists())
-        dataset_df.to_csv(DATASET_CACHE_PATH, index=False)
-
-    if "dataset_index" not in dataset_df.columns:
-        dataset_df = dataset_df.reset_index(drop=True).copy()
-        dataset_df["dataset_index"] = np.arange(len(dataset_df), dtype=int)
-        dataset_df.to_csv(DATASET_CACHE_PATH, index=False)
-
-    dataset_df["dataset_index"] = pd.to_numeric(dataset_df["dataset_index"], errors="coerce").astype(int)
-    return dataset_df.sort_values("dataset_index").reset_index(drop=True)
-
-
-def build_classification_dataset(df: pd.DataFrame, logger: RunLogger) -> pd.DataFrame:
-    classification_df = df.dropna(subset=["label"]).copy()
-    classification_df["label"] = classification_df["label"].astype(int)
-    logger.log(
-        f"Classification dataset assembled with {len(classification_df)} molecules "
-        f"({int(classification_df['label'].sum())} actives, {int((classification_df['label'] == 0).sum())} inactives)."
-    )
-    return classification_df.reset_index(drop=True)
-
-
-def build_regression_dataset(df: pd.DataFrame, logger: RunLogger) -> pd.DataFrame:
-    regression_df = df[np.isfinite(df["median_pchembl"])].copy()
-    logger.log(
-        f"Regression dataset assembled with {len(regression_df)} molecules spanning "
-        f"pChEMBL {regression_df['median_pchembl'].min():.2f} to {regression_df['median_pchembl'].max():.2f}."
-    )
-    return regression_df.reset_index(drop=True)
-
-
-def scaffold_groups(df: pd.DataFrame) -> np.ndarray:
-    return df["scaffold"].fillna(df["canonical_smiles"]).astype(str).to_numpy()
-
-
-def split_classification_dataset(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    splitter = StratifiedGroupKFold(n_splits=int(round(1.0 / TEST_SIZE)), shuffle=True, random_state=RANDOM_SEED)
-    groups = scaffold_groups(df)
-    train_idx, test_idx = next(splitter.split(df, df["label"], groups))
-    train_df = df.iloc[train_idx].copy().reset_index(drop=True)
-    test_df = df.iloc[test_idx].copy().reset_index(drop=True)
-    train_df.to_csv(CLASSIFICATION_TRAIN_PATH, index=False)
-    test_df.to_csv(CLASSIFICATION_TEST_PATH, index=False)
-    logger.log(
-        f"Scaffold classification split: train={len(train_df)} ({train_df['label'].mean():.3f} positive), "
-        f"test={len(test_df)} ({test_df['label'].mean():.3f} positive)."
-    )
-    return train_df, test_df
-
-
-def split_regression_dataset(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    splitter = GroupShuffleSplit(n_splits=1, test_size=TEST_SIZE, random_state=RANDOM_SEED)
-    groups = scaffold_groups(df)
-    train_idx, test_idx = next(splitter.split(df, groups=groups))
-    train_df = df.iloc[train_idx].copy().reset_index(drop=True)
-    test_df = df.iloc[test_idx].copy().reset_index(drop=True)
-    train_df.to_csv(REGRESSION_TRAIN_PATH, index=False)
-    test_df.to_csv(REGRESSION_TEST_PATH, index=False)
-    logger.log(f"Scaffold regression split: train={len(train_df)} molecules, test={len(test_df)} molecules.")
-    return train_df, test_df
-
-
-def build_temporal_split(
-    df: pd.DataFrame,
-    path_train: Path,
-    path_test: Path,
-    logger: RunLogger,
-    require_binary_labels: bool,
-) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]] | None:
-    temporal_df = df.dropna(subset=["first_document_year"]).copy()
-    if temporal_df.empty:
-        logger.log("Temporal split skipped because no publication years are available.")
-        return None
-
-    temporal_df["first_document_year"] = pd.to_numeric(temporal_df["first_document_year"], errors="coerce")
-    temporal_df = temporal_df.dropna(subset=["first_document_year"]).copy()
-    temporal_df["first_document_year"] = temporal_df["first_document_year"].astype(int)
-    if temporal_df["first_document_year"].nunique() < 3:
-        logger.log("Temporal split skipped because fewer than three distinct publication years are available.")
-        return None
-
-    year_counts = temporal_df["first_document_year"].value_counts().sort_index()
-    total_rows = len(temporal_df)
-    selected_years: List[int] = []
-    running_rows = 0
-    for year in sorted(year_counts.index, reverse=True):
-        selected_years.append(int(year))
-        running_rows += int(year_counts.loc[year])
-        if running_rows / total_rows >= TEST_SIZE:
-            break
-
-    test_df = temporal_df[temporal_df["first_document_year"].isin(selected_years)].copy().reset_index(drop=True)
-    train_df = temporal_df[~temporal_df["first_document_year"].isin(selected_years)].copy().reset_index(drop=True)
-    if len(train_df) < 100 or len(test_df) < 50:
-        logger.log("Temporal split skipped because the resulting train/test partitions are too small.")
-        return None
-
-    if require_binary_labels and (train_df["label"].nunique() < 2 or test_df["label"].nunique() < 2):
-        logger.log("Temporal split skipped because one side of the split does not contain both classes.")
-        return None
-
-    train_df.to_csv(path_train, index=False)
-    test_df.to_csv(path_test, index=False)
-    metadata = {
-        "train_max_year": int(train_df["first_document_year"].max()),
-        "test_years": sorted(selected_years),
-        "train_rows": len(train_df),
-        "test_rows": len(test_df),
-    }
-    logger.log(
-        f"Temporal split built with train years <= {metadata['train_max_year']} and test years {metadata['test_years']}."
-    )
-    return train_df, test_df, metadata
-
-
-def featurize_dataset(df: pd.DataFrame, logger: RunLogger) -> FeatureBlocks:
-    n_molecules = len(df)
-    descriptor_names = list(DESCRIPTOR_FUNCTIONS.keys())
-    arrays: Dict[str, np.ndarray] = {
-        "morgan_2048": np.zeros((n_molecules, MORGAN_BITS), dtype=np.float32),
-        "maccs": np.zeros((n_molecules, 167), dtype=np.float32),
-        "atom_pair_2048": np.zeros((n_molecules, ATOM_PAIR_BITS), dtype=np.float32),
-        "torsion_2048": np.zeros((n_molecules, TORSION_BITS), dtype=np.float32),
-        "descriptors": np.zeros((n_molecules, len(descriptor_names)), dtype=np.float32),
-    }
-    names: Dict[str, List[str]] = {
-        "morgan_2048": [f"morgan_bit_{index}" for index in range(MORGAN_BITS)],
-        "maccs": [f"maccs_bit_{index}" for index in range(167)],
-        "atom_pair_2048": [f"atom_pair_bit_{index}" for index in range(ATOM_PAIR_BITS)],
-        "torsion_2048": [f"torsion_bit_{index}" for index in range(TORSION_BITS)],
-        "descriptors": descriptor_names,
-    }
-    morgan_fingerprints: List[Any] = []
-
-    with logger.section("Generating molecular feature blocks"):
-        # Prepare enumerated SMILES list for parallel processing
-        smiles_enumerated = list(enumerate(df["smiles"].tolist()))
-        # Parallel processing function
-        def _process(item):
-            row_idx, smiles = item
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is None:
-                raise ValueError(f"Could not parse SMILES at dataset row {row_idx + 1}: {smiles}")
-            mfp = MORGAN_GENERATOR.GetFingerprint(mol)
-            maccs_fp = MACCSkeys.GenMACCSKeys(mol)
-            atom_pair_fp = ATOM_PAIR_GENERATOR.GetFingerprint(mol)
-            torsion_fp = TORSION_GENERATOR.GetFingerprint(mol)
-            descriptor_vals = np.asarray([float(func(mol)) for func in DESCRIPTOR_FUNCTIONS.values()], dtype=np.float32)
-            return (row_idx, mfp, maccs_fp, atom_pair_fp, torsion_fp, descriptor_vals)
-        # Execute in parallel using joblib
-        results = Parallel(n_jobs=MAX_PARALLEL_WORKERS, backend="loky")(
-            delayed(_process)(item) for item in smiles_enumerated
-        )
-        # Populate arrays and collect fingerprints
-        for row_idx, mfp, maccs_fp, atom_pair_fp, torsion_fp, descriptor_vals in results:
-            DataStructs.ConvertToNumpyArray(mfp, arrays["morgan_2048"][row_idx])
-            DataStructs.ConvertToNumpyArray(maccs_fp, arrays["maccs"][row_idx])
-            DataStructs.ConvertToNumpyArray(atom_pair_fp, arrays["atom_pair_2048"][row_idx])
-            DataStructs.ConvertToNumpyArray(torsion_fp, arrays["torsion_2048"][row_idx])
-            arrays["descriptors"][row_idx] = descriptor_vals
-            morgan_fingerprints.append(mfp)
-            if (row_idx + 1) % 250 == 0:
-                logger.log(f"Featurized {row_idx + 1}/{n_molecules} molecules.")
-        # Ensure final log if not on a 250 boundary
-        if n_molecules % 250 != 0:
-            logger.log(f"Featurized {n_molecules}/{n_molecules} molecules.")
-
-    return FeatureBlocks(arrays=arrays, names=names, morgan_fingerprints=morgan_fingerprints)
-
-
-def compose_feature_matrix(blocks: FeatureBlocks, recipe_name: str, row_ids: np.ndarray | None = None) -> Tuple[np.ndarray, List[str]]:
-    component_names = FEATURE_RECIPES[recipe_name]
-    arrays = [blocks.arrays[name] for name in component_names]
-    feature_names = [feature_name for name in component_names for feature_name in blocks.names[name]]
-    matrix = np.concatenate(arrays, axis=1)
-    if row_ids is not None:
-        matrix = matrix[row_ids]
-    return matrix, feature_names
-
-
-def load_feature_benchmark_checkpoint(task: str) -> pd.DataFrame:
-    if not FEATURE_BENCHMARK_PATH.exists():
-        return pd.DataFrame()
-
-    checkpoint_df = pd.read_csv(FEATURE_BENCHMARK_PATH)
-    if "task" not in checkpoint_df.columns or "representation" not in checkpoint_df.columns:
-        return pd.DataFrame()
-
-    return checkpoint_df[checkpoint_df["task"] == task].copy()
-
-
-def save_feature_benchmark_checkpoint(task: str, task_rows: Sequence[Dict[str, Any]]) -> None:
-    current_task_df = pd.DataFrame(task_rows)
-
-    if FEATURE_BENCHMARK_PATH.exists():
-        existing_df = pd.read_csv(FEATURE_BENCHMARK_PATH)
-        if "task" in existing_df.columns:
-            existing_df = existing_df[existing_df["task"] != task].copy()
-        combined_df = pd.concat([existing_df, current_task_df], ignore_index=True)
-    else:
-        combined_df = current_task_df
-
-    combined_df.to_csv(FEATURE_BENCHMARK_PATH, index=False)
-
-
-def to_jsonable(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): to_jsonable(inner_value) for key, inner_value in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_jsonable(inner_value) for inner_value in value]
-    if isinstance(value, np.generic):
-        return value.item()
-    return value
-
-
-def load_best_params_checkpoint(path: Path) -> Dict[str, Dict[str, Any]]:
-    if not path.exists():
-        return {}
-
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {}
-
-    if not isinstance(payload, dict):
-        return {}
-
-    cleaned: Dict[str, Dict[str, Any]] = {}
-    for model_name, record in payload.items():
-        if not isinstance(record, dict) or "params" not in record:
-            continue
-        cleaned[str(model_name)] = {
-            "params": to_jsonable(record["params"]),
-            "primary_score": float(record.get("primary_score", np.nan)),
-        }
-    return cleaned
-
-
-def save_best_params_checkpoint(path: Path, checkpoint: Dict[str, Dict[str, Any]]) -> None:
-    serializable = {model_name: to_jsonable(record) for model_name, record in checkpoint.items()}
-    path.write_text(json.dumps(serializable, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def load_tuning_results_checkpoint(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        return pd.DataFrame()
-    return pd.read_csv(path)
-
-
-def save_tuning_results_checkpoint(path: Path, existing_df: pd.DataFrame, model_name: str, model_df: pd.DataFrame) -> pd.DataFrame:
-    if existing_df.empty:
-        combined_df = model_df.copy()
-    else:
-        filtered_df = existing_df.copy()
-        if "model" in filtered_df.columns:
-            filtered_df = filtered_df[filtered_df["model"] != model_name].copy()
-        combined_df = pd.concat([filtered_df, model_df], ignore_index=True)
-
-    combined_df.to_csv(path, index=False)
-    return combined_df
-
-
-def checkpoint_placeholder_rows(
-    checkpoint: Dict[str, Dict[str, Any]],
-    primary_score_column: str,
-    score_is_negative: bool,
-) -> pd.DataFrame:
-    rows: List[Dict[str, Any]] = []
-    for model_name, record in checkpoint.items():
-        score = float(record.get("primary_score", np.nan))
-        if score_is_negative and np.isfinite(score):
-            score = -score
-        rows.append(
-            {
-                "model": model_name,
-                "params": json.dumps(to_jsonable(record.get("params", {})), sort_keys=True),
-                primary_score_column: score,
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def bootstrap_metrics(y_true: np.ndarray, y_prob: np.ndarray, n_boot: int = 2000, seed: int = 42) -> Dict[str, Tuple[float, float]]:
-    """Return 95 % confidence intervals for MCC and PR‑AUC/ROC‑AUC via bootstrap.
-    Returns a dict mapping metric name to (low, high) percentiles.
-    """
-    rng = np.random.default_rng(seed)
-    metrics: Dict[str, List[float]] = {"mcc": [], "pr_auc": [], "roc_auc": []}
-    for _ in range(n_boot):
-        idx = rng.integers(0, len(y_true), len(y_true))
-        yt, yp = y_true[idx], y_prob[idx]
-        # MCC
-        mcc_val = matthews_corrcoef(yt, (yp >= 0.5).astype(int))
-        metrics["mcc"].append(mcc_val)
-        # PR AUC and ROC AUC
-        try:
-            pr = average_precision_score(yt, yp)
-            roc = roc_auc_score(yt, yp)
-        except ValueError:
-            # In case a bootstrap sample has only one class
-            pr = np.nan
-            roc = np.nan
-        metrics["pr_auc"].append(pr)
-        metrics["roc_auc"].append(roc)
-    ci: Dict[str, Tuple[float, float]] = {}
-    for name, vals in metrics.items():
-        vals_arr = np.array(vals)
-        # Remove NaNs
-        vals_arr = vals_arr[np.isfinite(vals_arr)]
-        if vals_arr.size == 0:
-            ci[name] = (np.nan, np.nan)
-        else:
-            ci[name] = (float(np.percentile(vals_arr, 2.5)), float(np.percentile(vals_arr, 97.5)))
-    return ci
-
-
-def classification_metrics_from_probabilities(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
-    threshold: float = 0.5,
-) -> Dict[str, float]:
-    y_pred = (y_prob >= threshold).astype(int)
-    return {
-        "accuracy": accuracy_score(y_true, y_pred),
-        "roc_auc": roc_auc_score(y_true, y_prob),
-        "pr_auc": average_precision_score(y_true, y_prob),
-        "precision": precision_score(y_true, y_pred, zero_division=0),
-        "recall": recall_score(y_true, y_pred, zero_division=0),
-        "f1": f1_score(y_true, y_pred, zero_division=0),
-        "mcc": matthews_corrcoef(y_true, y_pred),
-    }
-
-
-def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-    return {
-        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
-        "mae": float(mean_absolute_error(y_true, y_pred)),
-        "r2": float(r2_score(y_true, y_pred)),
-    }
-
-
-def predict_positive_probability(model: Any, X: np.ndarray) -> np.ndarray:
-    if hasattr(model, "predict_proba"):
-        probabilities = np.asarray(model.predict_proba(X))
-        if probabilities.ndim == 2:
-            return probabilities[:, 1]
-        return probabilities.reshape(-1)
-
-    if hasattr(model, "decision_function"):
-        decision = np.asarray(model.decision_function(X)).reshape(-1)
-        return 1.0 / (1.0 + np.exp(-decision))
-
-    return np.asarray(model.predict(X)).reshape(-1).astype(float)
-
-
-def fit_classifier(model: Any, X_train: np.ndarray, y_train: np.ndarray, sample_weight: np.ndarray | None) -> Any:
-    try:
-        if sample_weight is not None:
-            model.fit(X_train, y_train, sample_weight=sample_weight)
-        else:
-            model.fit(X_train, y_train)
-    except TypeError:
-        model.fit(X_train, y_train)
-    return model
-
-
-def fit_regressor(model: Any, X_train: np.ndarray, y_train: np.ndarray) -> Any:
-    model.fit(X_train, y_train)
-    return model
-
-
-def benchmark_classification_representations(
-    train_df: pd.DataFrame,
-    blocks: FeatureBlocks,
-    logger: RunLogger,
-) -> Tuple[pd.DataFrame, str]:
-    y_train = train_df["label"].to_numpy(dtype=int)
-    groups = scaffold_groups(train_df)
-    row_ids = train_df["dataset_index"].to_numpy(dtype=int)
-    cv = StratifiedGroupKFold(n_splits=CLASSIFICATION_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
-    existing_df = load_feature_benchmark_checkpoint("classification")
-    rows: List[Dict[str, Any]] = existing_df.to_dict(orient="records")
-    completed_representations = set(existing_df.get("representation", pd.Series(dtype=str)).astype(str).tolist())
-
-    if completed_representations:
-        logger.log(
-            f"Resuming classification benchmarks with {len(completed_representations)} cached representations: "
-            f"{', '.join(sorted(completed_representations))}"
-        )
-
-    for recipe_name in BENCHMARK_REPRESENTATIONS:
-        if recipe_name in completed_representations:
-            logger.log(f"Skipping classification representation '{recipe_name}' because it is already checkpointed.")
-            continue
-
-        logger.log(f"Benchmarking classification representation '{recipe_name}'")
-        X_train, _ = compose_feature_matrix(blocks, recipe_name, row_ids=row_ids)
-        fold_metrics: List[Dict[str, float]] = []
-        for fold_number, (fit_idx, valid_idx) in enumerate(cv.split(X_train, y_train, groups), start=1):
-            model = ExtraTreesClassifier(
-                n_estimators=FEATURE_BENCHMARK_TREES,
-                random_state=RANDOM_SEED,
-                n_jobs=MAX_PARALLEL_WORKERS,
-                class_weight="balanced_subsample",
-            )
-            fold_weights = compute_sample_weight(class_weight="balanced", y=y_train[fit_idx])
-            fit_classifier(model, X_train[fit_idx], y_train[fit_idx], sample_weight=fold_weights)
-            y_prob = predict_positive_probability(model, X_train[valid_idx])
-            metrics = classification_metrics_from_probabilities(y_train[valid_idx], y_prob)
-            fold_metrics.append(metrics)
-            logger.log(
-                f"  Fold {fold_number}/{CLASSIFICATION_CV_FOLDS}: MCC={metrics['mcc']:.3f}, "
-                f"PR-AUC={metrics['pr_auc']:.3f}, ROC-AUC={metrics['roc_auc']:.3f}"
-            )
-
-        rows.append(
-            {
-                "task": "classification",
-                "representation": recipe_name,
-                "mean_mcc": float(np.mean([metric["mcc"] for metric in fold_metrics])),
-                "std_mcc": float(np.std([metric["mcc"] for metric in fold_metrics])),
-                "mean_pr_auc": float(np.mean([metric["pr_auc"] for metric in fold_metrics])),
-                "mean_roc_auc": float(np.mean([metric["roc_auc"] for metric in fold_metrics])),
-                "mean_accuracy": float(np.mean([metric["accuracy"] for metric in fold_metrics])),
-            }
-        )
-        save_feature_benchmark_checkpoint("classification", rows)
-
-    benchmark_df = pd.DataFrame(rows).sort_values(["mean_mcc", "mean_pr_auc", "mean_roc_auc"], ascending=False).reset_index(drop=True)
-    best_representation = str(benchmark_df.iloc[0]["representation"])
-    logger.log(f"Best classification representation: {best_representation} (mean MCC={benchmark_df.iloc[0]['mean_mcc']:.3f})")
-    return benchmark_df, best_representation
-
-
-def benchmark_regression_representations(
-    train_df: pd.DataFrame,
-    blocks: FeatureBlocks,
-    logger: RunLogger,
-) -> Tuple[pd.DataFrame, str]:
-    y_train = train_df["median_pchembl"].to_numpy(dtype=float)
-    groups = scaffold_groups(train_df)
-    row_ids = train_df["dataset_index"].to_numpy(dtype=int)
-    cv = GroupKFold(n_splits=REGRESSION_CV_FOLDS)
-    existing_df = load_feature_benchmark_checkpoint("regression")
-    rows: List[Dict[str, Any]] = existing_df.to_dict(orient="records")
-    completed_representations = set(existing_df.get("representation", pd.Series(dtype=str)).astype(str).tolist())
-
-    if completed_representations:
-        logger.log(
-            f"Resuming regression benchmarks with {len(completed_representations)} cached representations: "
-            f"{', '.join(sorted(completed_representations))}"
-        )
-
-    for recipe_name in BENCHMARK_REPRESENTATIONS:
-        if recipe_name in completed_representations:
-            logger.log(f"Skipping regression representation '{recipe_name}' because it is already checkpointed.")
-            continue
-
-        logger.log(f"Benchmarking regression representation '{recipe_name}'")
-        X_train, _ = compose_feature_matrix(blocks, recipe_name, row_ids=row_ids)
-        fold_metrics: List[Dict[str, float]] = []
-        for fold_number, (fit_idx, valid_idx) in enumerate(cv.split(X_train, y_train, groups), start=1):
-            model = ExtraTreesRegressor(
-                n_estimators=FEATURE_BENCHMARK_TREES,
-                random_state=RANDOM_SEED,
-                n_jobs=MAX_PARALLEL_WORKERS,
-            )
-            fit_regressor(model, X_train[fit_idx], y_train[fit_idx])
-            y_pred = np.asarray(model.predict(X_train[valid_idx])).reshape(-1)
-            metrics = regression_metrics(y_train[valid_idx], y_pred)
-            fold_metrics.append(metrics)
-            logger.log(
-                f"  Fold {fold_number}/{REGRESSION_CV_FOLDS}: RMSE={metrics['rmse']:.3f}, "
-                f"MAE={metrics['mae']:.3f}, R2={metrics['r2']:.3f}"
-            )
-
-        rows.append(
-            {
-                "task": "regression",
-                "representation": recipe_name,
-                "mean_rmse": float(np.mean([metric["rmse"] for metric in fold_metrics])),
-                "std_rmse": float(np.std([metric["rmse"] for metric in fold_metrics])),
-                "mean_mae": float(np.mean([metric["mae"] for metric in fold_metrics])),
-                "mean_r2": float(np.mean([metric["r2"] for metric in fold_metrics])),
-            }
-        )
-        save_feature_benchmark_checkpoint("regression", rows)
-
-    benchmark_df = pd.DataFrame(rows).sort_values(["mean_rmse", "mean_mae", "mean_r2"], ascending=[True, True, False]).reset_index(drop=True)
-    best_representation = str(benchmark_df.iloc[0]["representation"])
-    logger.log(f"Best regression representation: {best_representation} (mean RMSE={benchmark_df.iloc[0]['mean_rmse']:.3f})")
-    return benchmark_df, best_representation
-
-
-def classification_model_specs() -> Dict[str, Tuple[Any, Dict[str, Any]]]:
-    return {
-        "Logistic Regression": (
-            LogisticRegression(max_iter=4000, solver="saga", random_state=RANDOM_SEED, class_weight="balanced"),
-            {"C": loguniform(1e-2, 10.0), "l1_ratio": [0.0, 1.0]},
-        ),
-        "Random Forest": (
-            RandomForestClassifier(random_state=RANDOM_SEED, n_jobs=MAX_PARALLEL_WORKERS, class_weight="balanced_subsample"),
-            {
-                "n_estimators": randint(150, 351),
-                "max_depth": [None, 12, 18, 24, 32],
-                "min_samples_split": randint(2, 10),
-                "min_samples_leaf": randint(1, 5),
-                "max_features": ["sqrt", 0.35, 0.50],
-            },
-        ),
-        "Extra Trees": (
-            ExtraTreesClassifier(random_state=RANDOM_SEED, n_jobs=MAX_PARALLEL_WORKERS, class_weight="balanced_subsample"),
-            {
-                "n_estimators": randint(150, 401),
-                "max_depth": [None, 16, 24, 32],
-                "min_samples_split": randint(2, 10),
-                "min_samples_leaf": randint(1, 4),
-                "max_features": ["sqrt", 0.35, 0.50],
-            },
-        ),
-        "HistGradientBoosting": (
-            HistGradientBoostingClassifier(random_state=RANDOM_SEED),
-            {
-                "learning_rate": loguniform(0.02, 0.20),
-                "max_iter": randint(150, 351),
-                "max_leaf_nodes": randint(15, 96),
-                "max_depth": [None, 4, 8, 12],
-                "min_samples_leaf": randint(10, 51),
-                "l2_regularization": loguniform(1e-4, 1.0),
-            },
-        ),
-    }
-
-
-def regression_model_specs() -> Dict[str, Tuple[Any, Dict[str, Any]]]:
-    return {
-        "Random Forest Regressor": (
-            RandomForestRegressor(random_state=RANDOM_SEED, n_jobs=MAX_PARALLEL_WORKERS),
-            {
-                "n_estimators": randint(150, 351),
-                "max_depth": [None, 12, 18, 24, 32],
-                "min_samples_split": randint(2, 10),
-                "min_samples_leaf": randint(1, 5),
-                "max_features": ["sqrt", 0.35, 0.50],
-            },
-        ),
-        "Extra Trees Regressor": (
-            ExtraTreesRegressor(random_state=RANDOM_SEED, n_jobs=MAX_PARALLEL_WORKERS),
-            {
-                "n_estimators": randint(150, 401),
-                "max_depth": [None, 16, 24, 32],
-                "min_samples_split": randint(2, 10),
-                "min_samples_leaf": randint(1, 4),
-                "max_features": ["sqrt", 0.35, 0.50],
-            },
-        ),
-        "HistGradientBoostingRegressor": (
-            HistGradientBoostingRegressor(random_state=RANDOM_SEED),
-            {
-                "learning_rate": loguniform(0.02, 0.20),
-                "max_iter": randint(150, 351),
-                "max_leaf_nodes": randint(15, 96),
-                "max_depth": [None, 4, 8, 12],
-                "min_samples_leaf": randint(10, 51),
-                "l2_regularization": loguniform(1e-4, 1.0),
-            },
-        ),
-    }
-
-
-def tune_classification_models(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    groups: np.ndarray,
-    logger: RunLogger,
-) -> Tuple[Dict[str, Any], pd.DataFrame]:
-    cv = StratifiedGroupKFold(n_splits=CLASSIFICATION_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
-    scoring = {
-        "mcc": make_scorer(matthews_corrcoef),
-        "pr_auc": "average_precision",
-        "roc_auc": "roc_auc",
-        "accuracy": "accuracy",
-    }
-    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train)
-    tuned_models: Dict[str, Any] = {}
-    cv_results_df = load_tuning_results_checkpoint(CLASSIFICATION_CV_RESULTS_PATH)
-    best_params_checkpoint = load_best_params_checkpoint(CLASSIFICATION_BEST_PARAMS_PATH)
-    model_specs = classification_model_specs()
-
-    if best_params_checkpoint:
-        placeholder_df = checkpoint_placeholder_rows(best_params_checkpoint, "mean_test_mcc", score_is_negative=False)
-        if cv_results_df.empty:
-            cv_results_df = placeholder_df
-        elif "model" in cv_results_df.columns:
-            missing_models = set(placeholder_df["model"]) - set(cv_results_df["model"].astype(str))
-            if missing_models:
-                cv_results_df = pd.concat(
-                    [cv_results_df, placeholder_df[placeholder_df["model"].isin(sorted(missing_models))]],
-                    ignore_index=True,
-                )
-        save_tuning_results_checkpoint(CLASSIFICATION_CV_RESULTS_PATH, pd.DataFrame(), "__full__", cv_results_df)
-
-    if best_params_checkpoint:
-        logger.log(
-            f"Resuming classification tuning with {len(best_params_checkpoint)} cached models: "
-            f"{', '.join(sorted(best_params_checkpoint))}"
-        )
-
-    for model_name, (estimator, param_distributions) in model_specs.items():
-        if model_name in best_params_checkpoint:
-            logger.log(f"Restoring checkpointed classification model '{model_name}' on the scaffold-training split.")
-            try:
-                restored_estimator = clone(estimator).set_params(**best_params_checkpoint[model_name]["params"])
-                tuned_models[model_name] = fit_classifier(restored_estimator, X_train, y_train, sample_weight=sample_weight)
-                logger.log(f"Skipping classification model '{model_name}' because it is already checkpointed.")
-                continue
-            except Exception as error:
-                logger.log(
-                    f"  Failed to restore checkpointed classification model '{model_name}': "
-                    f"{error.__class__.__name__}: {error}. Retuning from scratch."
-                )
-
-        logger.log(f"Tuning classification model '{model_name}' with {CLASSIFICATION_CV_FOLDS}-fold CV")
-        try:
-            search = RandomizedSearchCV(
-                estimator=estimator,
-                param_distributions=param_distributions,
-                n_iter=CLASSIFICATION_SEARCH_ITERATIONS,
-                scoring=scoring,
-                refit="mcc",
-                cv=cv,
-                random_state=RANDOM_SEED,
-                n_jobs=1,
-                return_train_score=False,
-                error_score="raise",
-            )
-            try:
-                search.fit(X_train, y_train, groups=groups, sample_weight=sample_weight)
-            except TypeError:
-                search.fit(X_train, y_train, groups=groups)
-
-            tuned_models[model_name] = search.best_estimator_
-            best_params = to_jsonable(search.best_params_)
-            logger.log(f"  Best {model_name}: CV MCC={search.best_score_:.3f}, params={best_params}")
-            results_df = pd.DataFrame(search.cv_results_)
-            trimmed = results_df[
-                ["rank_test_mcc", "mean_test_mcc", "std_test_mcc", "mean_test_pr_auc", "mean_test_roc_auc", "mean_test_accuracy", "params"]
-            ].copy().sort_values("rank_test_mcc").head(10)
-            trimmed["model"] = model_name
-            trimmed["params"] = trimmed["params"].apply(lambda value: json.dumps(to_jsonable(value), sort_keys=True))
-            cv_results_df = save_tuning_results_checkpoint(CLASSIFICATION_CV_RESULTS_PATH, cv_results_df, model_name, trimmed)
-            best_params_checkpoint[model_name] = {
-                "params": best_params,
-                "primary_score": float(search.best_score_),
-            }
-            save_best_params_checkpoint(CLASSIFICATION_BEST_PARAMS_PATH, best_params_checkpoint)
-        except Exception as error:
-            logger.log(f"  Classification tuning failed for '{model_name}': {error}")
-            logger.log(f"  Skipping classification model '{model_name}' and continuing with the remaining tuned models.")
-            continue
-
-    if not tuned_models:
-        raise RuntimeError("No classification models were successfully tuned or restored from checkpoint.")
-
-    if cv_results_df.empty and best_params_checkpoint:
-        cv_results_df = checkpoint_placeholder_rows(best_params_checkpoint, "mean_test_mcc", score_is_negative=False)
-
-    return tuned_models, cv_results_df
-
-
-def tune_regression_models(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    groups: np.ndarray,
-    logger: RunLogger,
-) -> Tuple[Dict[str, Any], pd.DataFrame]:
-    cv = GroupKFold(n_splits=REGRESSION_CV_FOLDS)
-    scoring = {"rmse": "neg_root_mean_squared_error", "mae": "neg_mean_absolute_error", "r2": "r2"}
-    tuned_models: Dict[str, Any] = {}
-    cv_results_df = load_tuning_results_checkpoint(REGRESSION_CV_RESULTS_PATH)
-    best_params_checkpoint = load_best_params_checkpoint(REGRESSION_BEST_PARAMS_PATH)
-    model_specs = regression_model_specs()
-
-    if best_params_checkpoint:
-        placeholder_df = checkpoint_placeholder_rows(best_params_checkpoint, "mean_test_rmse", score_is_negative=True)
-        if cv_results_df.empty:
-            cv_results_df = placeholder_df
-        elif "model" in cv_results_df.columns:
-            missing_models = set(placeholder_df["model"]) - set(cv_results_df["model"].astype(str))
-            if missing_models:
-                cv_results_df = pd.concat(
-                    [cv_results_df, placeholder_df[placeholder_df["model"].isin(sorted(missing_models))]],
-                    ignore_index=True,
-                )
-        save_tuning_results_checkpoint(REGRESSION_CV_RESULTS_PATH, pd.DataFrame(), "__full__", cv_results_df)
-
-    if best_params_checkpoint:
-        logger.log(
-            f"Resuming regression tuning with {len(best_params_checkpoint)} cached models: "
-            f"{', '.join(sorted(best_params_checkpoint))}"
-        )
-
-    for model_name, (estimator, param_distributions) in model_specs.items():
-        if model_name in best_params_checkpoint:
-            logger.log(f"Restoring checkpointed regression model '{model_name}' on the scaffold-training split.")
-            try:
-                restored_estimator = clone(estimator).set_params(**best_params_checkpoint[model_name]["params"])
-                tuned_models[model_name] = fit_regressor(restored_estimator, X_train, y_train)
-                logger.log(f"Skipping regression model '{model_name}' because it is already checkpointed.")
-                continue
-            except Exception as error:
-                logger.log(
-                    f"  Failed to restore checkpointed regression model '{model_name}': "
-                    f"{error.__class__.__name__}: {error}. Retuning from scratch."
-                )
-
-        logger.log(f"Tuning regression model '{model_name}' with {REGRESSION_CV_FOLDS}-fold grouped CV")
-        try:
-            search = RandomizedSearchCV(
-                estimator=estimator,
-                param_distributions=param_distributions,
-                n_iter=REGRESSION_SEARCH_ITERATIONS,
-                scoring=scoring,
-                refit="rmse",
-                cv=cv,
-                random_state=RANDOM_SEED,
-                n_jobs=1,
-                return_train_score=False,
-                error_score="raise",
-            )
-            search.fit(X_train, y_train, groups=groups)
-            tuned_models[model_name] = search.best_estimator_
-            best_params = to_jsonable(search.best_params_)
-            logger.log(f"  Best {model_name}: CV RMSE={-search.best_score_:.3f}, params={best_params}")
-            results_df = pd.DataFrame(search.cv_results_)
-            trimmed = results_df[
-                ["rank_test_rmse", "mean_test_rmse", "std_test_rmse", "mean_test_mae", "mean_test_r2", "params"]
-            ].copy().sort_values("rank_test_rmse").head(10)
-            trimmed["model"] = model_name
-            trimmed["params"] = trimmed["params"].apply(lambda value: json.dumps(to_jsonable(value), sort_keys=True))
-            cv_results_df = save_tuning_results_checkpoint(REGRESSION_CV_RESULTS_PATH, cv_results_df, model_name, trimmed)
-            best_params_checkpoint[model_name] = {
-                "params": best_params,
-                "primary_score": float(search.best_score_),
-            }
-            save_best_params_checkpoint(REGRESSION_BEST_PARAMS_PATH, best_params_checkpoint)
-        except Exception as error:
-            logger.log(f"  Regression tuning failed for '{model_name}': {error}")
-            logger.log(f"  Skipping regression model '{model_name}' and continuing with the remaining tuned models.")
-            continue
-
-    if not tuned_models:
-        raise RuntimeError("No regression models were successfully tuned or restored from checkpoint.")
-
-    if cv_results_df.empty and best_params_checkpoint:
-        cv_results_df = checkpoint_placeholder_rows(best_params_checkpoint, "mean_test_rmse", score_is_negative=True)
-
-    return tuned_models, cv_results_df
-
-
-class GroupAwareStackingClassifier:
-    def __init__(self, base_models: Dict[str, Any], meta_model: Any) -> None:
-        self.base_models = base_models
-        self.meta_model = meta_model
-
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        stacked_features = np.column_stack([predict_positive_probability(model, X) for model in self.base_models.values()])
-        return np.asarray(self.meta_model.predict_proba(stacked_features))
-
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
-
-
-def train_group_aware_stacking_classifier(
-    base_estimators: Dict[str, Any],
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    groups: np.ndarray,
-    logger: RunLogger,
-) -> GroupAwareStackingClassifier:
-    cv = StratifiedGroupKFold(n_splits=CLASSIFICATION_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
-    estimator_names = list(base_estimators.keys())
-    oof_predictions = np.zeros((len(y_train), len(estimator_names)), dtype=np.float32)
-
-    for fold_number, (fit_idx, valid_idx) in enumerate(cv.split(X_train, y_train, groups), start=1):
-        logger.log(f"Training stacking fold {fold_number}/{CLASSIFICATION_CV_FOLDS}")
-        fold_weights = compute_sample_weight(class_weight="balanced", y=y_train[fit_idx])
-        for column_index, estimator_name in enumerate(estimator_names):
-            estimator = clone(base_estimators[estimator_name])
-            fit_classifier(estimator, X_train[fit_idx], y_train[fit_idx], sample_weight=fold_weights)
-            oof_predictions[valid_idx, column_index] = predict_positive_probability(estimator, X_train[valid_idx])
-
-    meta_model = LogisticRegression(max_iter=2000, solver="liblinear", random_state=RANDOM_SEED, class_weight="balanced")
-    meta_weights = compute_sample_weight(class_weight="balanced", y=y_train)
-    fit_classifier(meta_model, oof_predictions, y_train, sample_weight=meta_weights)
-
-    fitted_base_models: Dict[str, Any] = {}
-    full_weights = compute_sample_weight(class_weight="balanced", y=y_train)
-    for estimator_name, estimator in base_estimators.items():
-        fitted_estimator = clone(estimator)
-        fit_classifier(fitted_estimator, X_train, y_train, sample_weight=full_weights)
-        fitted_base_models[estimator_name] = fitted_estimator
-
-    return GroupAwareStackingClassifier(base_models=fitted_base_models, meta_model=meta_model)
-
-
-def simple_smote(X_train: np.ndarray, y_train: np.ndarray, random_state: int = RANDOM_SEED) -> Tuple[np.ndarray, np.ndarray]:
-    labels, counts = np.unique(y_train, return_counts=True)
-    if len(labels) != 2:
-        return X_train, y_train
-
-    minority_label = labels[np.argmin(counts)]
-    majority_count = int(np.max(counts))
-    minority_mask = y_train == minority_label
-    X_minority = X_train[minority_mask]
-    samples_needed = majority_count - len(X_minority)
-
-    if samples_needed <= 0:
-        return X_train, y_train
-    if len(X_minority) < 2:
-        repeated = np.repeat(X_minority, samples_needed, axis=0)
-        synthetic_y = np.full(samples_needed, minority_label, dtype=y_train.dtype)
-        return np.vstack([X_train, repeated]), np.concatenate([y_train, synthetic_y])
-
-    n_neighbors = min(SMOTE_K_NEIGHBORS, len(X_minority) - 1)
-    rng = np.random.default_rng(random_state)
-    neighbor_model = NearestNeighbors(n_neighbors=n_neighbors + 1)
-    neighbor_model.fit(X_minority)
-    neighbor_indices = neighbor_model.kneighbors(return_distance=False)
-
-    synthetic = np.zeros((samples_needed, X_train.shape[1]), dtype=np.float32)
-    for row_index in range(samples_needed):
-        anchor_index = int(rng.integers(0, len(X_minority)))
-        choices = neighbor_indices[anchor_index][1:]
-        neighbor_index = int(rng.choice(choices)) if len(choices) else anchor_index
-        gap = float(rng.random())
-        synthetic[row_index] = X_minority[anchor_index] + gap * (X_minority[neighbor_index] - X_minority[anchor_index])
-
-    synthetic_y = np.full(samples_needed, minority_label, dtype=y_train.dtype)
-    return np.vstack([X_train, synthetic]), np.concatenate([y_train, synthetic_y])
-
-
-def evaluate_classification_models(
-    models: Dict[str, Any],
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-    split_name: str,
-    logger: RunLogger | None = None,
-) -> List[ClassificationResult]:
-    results: List[ClassificationResult] = []
-    for model_name, model in models.items():
-        if logger is not None:
-            logger.log(f"  Evaluating classification model '{model_name}'")
-        try:
-            y_prob = predict_positive_probability(model, X_test)
-            metrics = classification_metrics_from_probabilities(y_test, y_prob)
-            y_pred = (y_prob >= 0.5).astype(int)
-            results.append(
-                ClassificationResult(
-                    name=model_name,
-                    split=split_name,
-                    accuracy=float(metrics["accuracy"]),
-                    roc_auc=float(metrics["roc_auc"]),
-                    pr_auc=float(metrics["pr_auc"]),
-                    precision=float(metrics["precision"]),
-                    recall=float(metrics["recall"]),
-                    f1=float(metrics["f1"]),
-                    mcc=float(metrics["mcc"]),
-                    y_prob=y_prob,
-                    y_pred=y_pred,
-                )
-            )
-            if logger is not None:
-                logger.log(
-                    f"    {model_name}: MCC={metrics['mcc']:.3f}, PR-AUC={metrics['pr_auc']:.3f}, "
-                    f"ROC-AUC={metrics['roc_auc']:.3f}"
-                )
-        except Exception as error:
-            if logger is not None:
-                logger.log(f"    Evaluation failed for '{model_name}': {error.__class__.__name__}: {error}")
-            continue
-
-    if not results:
-        raise RuntimeError(f"All classification evaluations failed for split '{split_name}'.")
-
-    return results
-
-
-def evaluate_regression_models(
-    models: Dict[str, Any],
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-    split_name: str,
-    logger: RunLogger | None = None,
-) -> List[RegressionResult]:
-    results: List[RegressionResult] = []
-    for model_name, model in models.items():
-        if logger is not None:
-            logger.log(f"  Evaluating regression model '{model_name}'")
-        try:
-            y_pred = np.asarray(model.predict(X_test)).reshape(-1)
-            metrics = regression_metrics(y_test, y_pred)
-            results.append(
-                RegressionResult(
-                    name=model_name,
-                    split=split_name,
-                    rmse=float(metrics["rmse"]),
-                    mae=float(metrics["mae"]),
-                    r2=float(metrics["r2"]),
-                    y_pred=y_pred,
-                )
-            )
-            if logger is not None:
-                logger.log(
-                    f"    {model_name}: RMSE={metrics['rmse']:.3f}, MAE={metrics['mae']:.3f}, "
-                    f"R2={metrics['r2']:.3f}"
-                )
-        except Exception as error:
-            if logger is not None:
-                logger.log(f"    Evaluation failed for '{model_name}': {error.__class__.__name__}: {error}")
-            continue
-
-    if not results:
-        raise RuntimeError(f"All regression evaluations failed for split '{split_name}'.")
-
-    return results
-
-
-def fit_classification_model_by_name(
-    model_name: str,
-    tuned_models: Dict[str, Any],
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    groups: np.ndarray,
-    logger: RunLogger,
-) -> Any:
-    if model_name == "Stacked Ensemble":
-        base_estimators = {name: tuned_models[name] for name in ("Random Forest", "Extra Trees", "HistGradientBoosting") if name in tuned_models}
-        return train_group_aware_stacking_classifier(base_estimators, X_train, y_train, groups, logger)
-
-    if model_name == "Extra Trees + SMOTE":
-        estimator = clone(tuned_models["Extra Trees"])
-        X_resampled, y_resampled = simple_smote(X_train, y_train)
-        return fit_classifier(estimator, X_resampled, y_resampled, sample_weight=None)
-
-    estimator = clone(tuned_models[model_name])
-    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train)
-    return fit_classifier(estimator, X_train, y_train, sample_weight=sample_weight)
-
-
-def compute_applicability_domain(
-    train_row_ids: np.ndarray,
-    test_row_ids: np.ndarray,
-    morgan_fingerprints: Sequence[Any],
-    logger: RunLogger,
-) -> Tuple[np.ndarray, float, np.ndarray]:
-    """Estimate the applicability‑domain (AD) using a fast nearest‑neighbour index.
-    If `faiss` is available we build a flat inner‑product index on the normalized
-    Morgan fingerprints (equivalent to cosine similarity). Otherwise we fall back to the
-    original exhaustive pairwise computation.
-    """
-    # Prepare training fingerprints as numpy array (float32) and L2‑normalize for cosine similarity
-    train_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in train_row_ids]])
-    # Convert bit strings to float vectors (0/1)
-    train_array = np.unpackbits(train_fps.view(np.uint8), axis=1).astype(np.float32)
-    train_norm = np.linalg.norm(train_array, axis=1, keepdims=True)
-    train_norm[train_norm == 0] = 1.0
-    train_normalized = train_array / train_norm
-
-    try:
-        import faiss
-        index = faiss.IndexFlatIP(train_normalized.shape[1])
-        faiss.normalize_L2(train_normalized)
-        index.add(train_normalized)
-        # Prepare test fingerprints similarly
-        test_fps = np.stack([np.frombuffer(fp.ToBitString().encode(), dtype=np.uint8) for fp in [morgan_fingerprints[i] for i in test_row_ids]])
-        test_array = np.unpackbits(test_fps.view(np.uint8), axis=1).astype(np.float32)
-        test_norm = np.linalg.norm(test_array, axis=1, keepdims=True)
-        test_norm[test_norm == 0] = 1.0
-        test_normalized = test_array / test_norm
-        faiss.normalize_L2(test_normalized)
-        # Search for nearest neighbour similarities
-        distances, _ = index.search(test_normalized, 1)
-        # distances are inner‑product (= cosine similarity because vectors are normalised)
-        test_similarity = distances.ravel()
-        logger.log("FAISS index used for applicability‑domain scoring.")
-    except Exception:
-        # Fallback to original exhaustive method
-        logger.log("FAISS not available; falling back to exhaustive similarity computation.")
-        train_fps = [morgan_fingerprints[i] for i in train_row_ids]
-        test_fps = [morgan_fingerprints[i] for i in test_row_ids]
-        train_neighbor_similarity = np.zeros(len(train_fps), dtype=np.float32)
-        with logger.section("Estimating applicability-domain threshold (fallback)"):
-            for index, fp in enumerate(train_fps):
-                similarities = list(DataStructs.BulkTanimotoSimilarity(fp, train_fps))
-                if len(similarities) > 1:
-                    similarities[index] = -1.0
-                    train_neighbor_similarity[index] = max(similarities)
-                else:
-                    train_neighbor_similarity[index] = 1.0
-                if index + 1 == len(train_fps) or (index + 1) % 250 == 0:
-                    logger.log(f"Processed {index + 1}/{len(train_fps)} training fingerprints for AD thresholding.")
-        threshold = float(np.percentile(train_neighbor_similarity, AD_SIMILARITY_PERCENTILE))
-        logger.log(f"Applicability-domain threshold set at Tanimoto similarity {threshold:.3f}")
-        test_similarity = np.zeros(len(test_fps), dtype=np.float32)
-        with logger.section("Scoring test molecules against the training chemical space (fallback)"):
-            for index, fp in enumerate(test_fps):
-                similarities = DataStructs.BulkTanimotoSimilarity(fp, train_fps)
-                test_similarity[index] = max(similarities) if similarities else 0.0
-                if index + 1 == len(test_fps) or (index + 1) % 250 == 0:
-                    logger.log(f"Processed {index + 1}/{len(test_fps)} test fingerprints for AD scoring.")
-        inside_ad = test_similarity >= threshold
-        return train_neighbor_similarity, threshold, inside_ad
-    # Compute threshold from training similarities
-    threshold = float(np.percentile(test_similarity, AD_SIMILARITY_PERCENTILE))
-    inside_ad = test_similarity >= threshold
-    return np.array([]), threshold, inside_ad
-
-
-def find_activity_cliffs(df: pd.DataFrame, morgan_fingerprints: Sequence[Any], logger: RunLogger) -> pd.DataFrame:
-    records: List[Dict[str, Any]] = []
-    y = df["median_pchembl"].to_numpy(dtype=float)
-    labels = df["label"].to_numpy()
-
-    with logger.section("Searching for activity cliffs"):
-        for left_index in range(len(df) - 1):
-            similarities = DataStructs.BulkTanimotoSimilarity(morgan_fingerprints[left_index], morgan_fingerprints[left_index + 1 :])
-            for offset, similarity in enumerate(similarities, start=1):
-                if similarity < ACTIVITY_CLIFF_SIMILARITY:
-                    continue
-                right_index = left_index + offset
-                delta_pchembl = abs(y[left_index] - y[right_index])
-                if delta_pchembl < ACTIVITY_CLIFF_DELTA_PCHEMBL:
-                    continue
-                records.append(
-                    {
-                        "left_compound": df.iloc[left_index]["compound_name"],
-                        "right_compound": df.iloc[right_index]["compound_name"],
-                        "left_smiles": df.iloc[left_index]["smiles"],
-                        "right_smiles": df.iloc[right_index]["smiles"],
-                        "tanimoto_similarity": float(similarity),
-                        "left_pchembl": float(y[left_index]),
-                        "right_pchembl": float(y[right_index]),
-                        "delta_pchembl": float(delta_pchembl),
-                        "left_label": labels[left_index],
-                        "right_label": labels[right_index],
-                    }
-                )
-            if left_index + 1 == len(df) - 1 or (left_index + 1) % 250 == 0:
-                logger.log(f"Activity-cliff scan progress: {left_index + 1}/{len(df) - 1} anchors processed.")
-
-    if not records:
-        logger.log("No activity cliffs passed the configured thresholds.")
-        return pd.DataFrame(
-            columns=[
-                "left_compound",
-                "right_compound",
-                "left_smiles",
-                "right_smiles",
-                "tanimoto_similarity",
-                "left_pchembl",
-                "right_pchembl",
-                "delta_pchembl",
-                "left_label",
-                "right_label",
-            ]
-        )
-
-    cliffs_df = pd.DataFrame(records).sort_values(["delta_pchembl", "tanimoto_similarity"], ascending=[False, False]).reset_index(drop=True)
-    logger.log(f"Detected {len(cliffs_df)} activity cliffs above the similarity and potency-delta thresholds.")
-    return cliffs_df
-
-
-def plot_roc_curves(results: Sequence[ClassificationResult], y_true: np.ndarray, output_path: Path) -> None:
-    """Generate static ROC curves using Matplotlib (kept for backward compatibility)."""
-    plt.figure(figsize=(7, 5))
-    for result in results:
-        fpr, tpr, _ = roc_curve(y_true, result.y_prob)
-        plt.plot(fpr, tpr, linewidth=2, label=f"{result.name} (AUC = {result.roc_auc:.3f})")
-    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Random baseline")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("ROC Curve: HIV-1 Protease Classification")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-# New interactive Plotly version
-def plot_roc_curves_interactive(results: Sequence[ClassificationResult], y_true: np.ndarray) -> go.Figure:
-    """Return a Plotly Figure with ROC curves for interactive display."""
-    fig = go.Figure()
-    for result in results:
-        fpr, tpr, _ = roc_curve(y_true, result.y_prob)
-        fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f"{result.name} (AUC={result.roc_auc:.3f})"))
-    fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', line=dict(dash='dash', color='gray'), name='Random baseline'))
-    fig.update_layout(title='ROC Curve: HIV-1 Protease Classification', xaxis_title='False Positive Rate', yaxis_title='True Positive Rate')
-    return fig
-
-
-
-def plot_precision_recall_curves(results: Sequence[ClassificationResult], y_true: np.ndarray, output_path: Path) -> None:
-    """Generate static PR curves using Matplotlib (kept for compatibility)."""
-    plt.figure(figsize=(7, 5))
-    baseline = float(np.mean(y_true))
-    for result in results:
-        precision, recall, _ = precision_recall_curve(y_true, result.y_prob)
-        plt.plot(recall, precision, linewidth=2, label=f"{result.name} (AP = {result.pr_auc:.3f})")
-    plt.axhline(baseline, linestyle="--", color="gray", label=f"Positive rate = {baseline:.3f}")
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.title("Precision-Recall Curve: HIV-1 Protease Classification")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-# New interactive Plotly version
-def plot_precision_recall_curves_interactive(results: Sequence[ClassificationResult], y_true: np.ndarray) -> go.Figure:
-    """Return a Plotly Figure with PR curves for interactive display."""
-    fig = go.Figure()
-    baseline = float(np.mean(y_true))
-    for result in results:
-        precision, recall, _ = precision_recall_curve(y_true, result.y_prob)
-        fig.add_trace(go.Scatter(x=recall, y=precision, mode='lines', name=f"{result.name} (AP={result.pr_auc:.3f})"))
-    fig.add_hline(y=baseline, line_dash='dash', line_color='gray', annotation_text=f'Positive rate = {baseline:.3f}')
-    fig.update_layout(title='Precision-Recall Curve: HIV-1 Protease Classification', xaxis_title='Recall', yaxis_title='Precision')
-    return fig
-
-
-
-def plot_feature_importance(model: Any, feature_names: Sequence[str], output_path: Path, top_n: int = TOP_FEATURES_TO_PLOT) -> None:
-    """Static Matplotlib feature‑importance plot (kept for compatibility)."""
-    importances = np.asarray(model.feature_importances_)
-    top_indices = np.argsort(importances)[-top_n:][::-1]
-    top_names = [feature_names[index] for index in top_indices]
-    plt.figure(figsize=(10, 6))
-    plt.bar(range(len(top_indices)), importances[top_indices], color="steelblue")
-    plt.xticks(range(len(top_indices)), top_names, rotation=65, ha="right")
-    plt.ylabel("Importance")
-    plt.title("Top Feature Importances")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-# New interactive Plotly version
-def plot_feature_importance_interactive(model: Any, feature_names: Sequence[str], top_n: int = TOP_FEATURES_TO_PLOT) -> go.Figure:
-    """Return a Plotly Figure with the top‑N feature importances."""
-    importances = np.asarray(model.feature_importances_)
-    top_indices = np.argsort(importances)[-top_n:][::-1]
-    top_names = [feature_names[index] for index in top_indices]
-    top_vals = importances[top_indices]
-    fig = go.Figure(go.Bar(x=top_names, y=top_vals, marker_color='steelblue'))
-    fig.update_layout(title='Top Feature Importances', xaxis_title='Feature', yaxis_title='Importance')
-    return fig
-
-
-
-def plot_regression_predictions(y_true: np.ndarray, y_pred: np.ndarray, output_path: Path) -> None:
-    plt.figure(figsize=(6, 6))
-    plt.scatter(y_true, y_pred, alpha=0.6, edgecolors="none", color="steelblue")
-    low = min(float(np.min(y_true)), float(np.min(y_pred)))
-    high = max(float(np.max(y_true)), float(np.max(y_pred)))
-    plt.plot([low, high], [low, high], linestyle="--", color="gray")
-    plt.xlabel("Observed pChEMBL")
-    plt.ylabel("Predicted pChEMBL")
-    plt.title("Regression Predictions on Scaffold Holdout")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-
-def select_feature_importance_model(models: Dict[str, Any], results: Sequence[ClassificationResult]) -> Tuple[Any, str]:
-    compatible = {name: model for name, model in models.items() if hasattr(model, "feature_importances_")}
-    if not compatible:
-        raise ValueError("No classification model exposes feature_importances_.")
-
-    ranked = sorted(results, key=lambda result: result.mcc, reverse=True)
-    for result in ranked:
-        if result.name in compatible:
-            return compatible[result.name], result.name
-
-    first_name = next(iter(compatible))
-    return compatible[first_name], first_name
-
-
-def probe_display_adapters() -> List[str]:
-    try:
-        probe = subprocess.run(
-            ["pnputil", "/enum-devices", "/class", "Display"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return []
-
-    if probe.returncode != 0 or not probe.stdout:
-        return []
-
-    adapter_names: List[str] = []
-    for line in probe.stdout.splitlines():
-        if line.strip().startswith("Device Description:"):
-            _, _, value = line.partition(":")
-            name = value.strip()
-            if name:
-                adapter_names.append(name)
-    return adapter_names
-
-
-def detect_runtime() -> RuntimeInfo:
-    adapters = probe_display_adapters()
-    amd_gpu = next((name for name in adapters if ("amd" in name.lower() or "radeon" in name.lower())), "")
-    gpu_related_modules = [name for name in ("lightgbm", "cuml") if module_available(name)]
-    rocm_env = {name: os.environ.get(name) for name in ("ROCM_PATH", "HIP_PATH", "CUDA_PATH") if os.environ.get(name)}
-
-    if amd_gpu:
-        message = (
-            f"AMD GPU detected ({amd_gpu}), but this environment has no working ROCm/OpenCL ML backend installed "
-            f"(modules found: {gpu_related_modules or 'none'}, env vars: {rocm_env or 'none'}). "
-            "The pipeline now runs CPU-first and does not attempt the old broken GPU training path."
-        )
-        return RuntimeInfo(backend="cpu", adapters=adapters, gpu_name=amd_gpu, message=message)
-
-    if adapters:
-        return RuntimeInfo(
-            backend="cpu",
-            adapters=adapters,
-            gpu_name="",
-            message=f"Display adapters detected ({', '.join(adapters)}), but no supported training backend is configured. Running on CPU.",
-        )
-
-    return RuntimeInfo(
-        backend="cpu",
-        adapters=[],
-        gpu_name="",
-        message="No display adapters were detected through pnputil. Running on CPU.",
-    )
-
-
-def classification_results_to_frame(results: Sequence[ClassificationResult]) -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "split": result.split,
-                "model": result.name,
-                "accuracy": result.accuracy,
-                "roc_auc": result.roc_auc,
-                "pr_auc": result.pr_auc,
-                "precision": result.precision,
-                "recall": result.recall,
-                "f1": result.f1,
-                "mcc": result.mcc,
-            }
-            for result in results
-        ]
-    ).sort_values(["split", "mcc", "pr_auc"], ascending=[True, False, False])
-
-
-def regression_results_to_frame(results: Sequence[RegressionResult]) -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "split": result.split,
-                "model": result.name,
-                "rmse": result.rmse,
-                "mae": result.mae,
-                "r2": result.r2,
-            }
-            for result in results
-        ]
-    ).sort_values(["split", "rmse", "mae"], ascending=[True, True, True])
-
-
-def print_summary(
-    runtime: RuntimeInfo,
-    curated_df: pd.DataFrame,
-    classification_df: pd.DataFrame,
-    regression_df: pd.DataFrame,
-    classification_train_df: pd.DataFrame,
-    classification_test_df: pd.DataFrame,
-    regression_train_df: pd.DataFrame,
-    regression_test_df: pd.DataFrame,
-    best_classification_representation: str,
-    best_regression_representation: str,
-    classification_results: Sequence[ClassificationResult],
-    regression_results: Sequence[RegressionResult],
-    ad_threshold: float,
-    inside_ad_fraction: float,
-    activity_cliffs_count: int,
-) -> None:
-    print("\n=== Runtime ===")
-    print(runtime.message)
-
-    print("\n=== Dataset Summary ===")
-    print(f"Targets used: {', '.join(CHEMBL_TARGET_IDS)}")
-    print(f"Activity types used: {', '.join(STANDARD_TYPES)}")
-    print(f"Curated molecules: {len(curated_df)}")
-    print(f"Classification molecules: {len(classification_df)}")
-    print(f"Regression molecules: {len(regression_df)}")
-    print(f"Classification train/test: {len(classification_train_df)} / {len(classification_test_df)}")
-    print(f"Regression train/test: {len(regression_train_df)} / {len(regression_test_df)}")
-    print(f"Publication years available: {int(curated_df['first_document_year'].notna().sum())} molecules")
-
-    print("\n=== Feature Engineering ===")
-    print(f"Best classification representation: {best_classification_representation}")
-    print(f"Best regression representation: {best_regression_representation}")
-    print("Feature blocks generated: Morgan-2048, MACCS, Atom Pair, Topological Torsion, RDKit descriptors")
-
-    print("\n=== Classification Holdout ===")
-    for result in sorted([result for result in classification_results if result.split == "scaffold"], key=lambda item: item.mcc, reverse=True):
-        print(
-            f"{result.name}: MCC={result.mcc:.3f}, PR-AUC={result.pr_auc:.3f}, ROC-AUC={result.roc_auc:.3f}, "
-            f"Precision={result.precision:.3f}, Recall={result.recall:.3f}, F1={result.f1:.3f}"
-        )
-
-    temporal_classification = [result for result in classification_results if result.split == "temporal"]
-    if temporal_classification:
-        best_temporal = max(temporal_classification, key=lambda item: item.mcc)
-        print(f"Temporal classification check: {best_temporal.name} MCC={best_temporal.mcc:.3f}, PR-AUC={best_temporal.pr_auc:.3f}")
-
-    print("\n=== Regression Holdout ===")
-    for result in sorted([result for result in regression_results if result.split == "scaffold"], key=lambda item: item.rmse):
-        print(f"{result.name}: RMSE={result.rmse:.3f}, MAE={result.mae:.3f}, R2={result.r2:.3f}")
-
-    temporal_regression = [result for result in regression_results if result.split == "temporal"]
-    if temporal_regression:
-        best_temporal_regression = min(temporal_regression, key=lambda item: item.rmse)
-        print(
-            f"Temporal regression check: {best_temporal_regression.name} RMSE={best_temporal_regression.rmse:.3f}, "
-            f"R2={best_temporal_regression.r2:.3f}"
-        )
-
-    print("\n=== Advanced Analyses ===")
-    print(f"Applicability-domain similarity threshold: {ad_threshold:.3f}")
-    print(f"Scaffold test molecules inside AD: {inside_ad_fraction:.1%}")
-    print(f"Activity cliffs found: {activity_cliffs_count}")
-
-    print("\nSaved files:")
-    for path in [
-        DATASET_CACHE_PATH,
-        CLASSIFICATION_TRAIN_PATH,
-        CLASSIFICATION_TEST_PATH,
-        REGRESSION_TRAIN_PATH,
-        REGRESSION_TEST_PATH,
-        FEATURE_BENCHMARK_PATH,
-        CLASSIFICATION_METRICS_PATH,
-        REGRESSION_METRICS_PATH,
-        CLASSIFICATION_PREDICTIONS_PATH,
-        REGRESSION_PREDICTIONS_PATH,
-        ACTIVITY_CLIFF_PATH,
-        ROC_PLOT_PATH,
-        PR_PLOT_PATH,
-        IMPORTANCE_PLOT_PATH,
-        REGRESSION_PLOT_PATH,
-        RUN_REPORT_PATH,
-        RUN_LOG_PATH,
-    ]:
-        print(f"- {path.name}")
+from dti_pipeline.evaluation import (
+    build_error_analysis,
+    build_leakage_report,
+    build_prediction_frame,
+    classification_results_to_frame,
+    compute_applicability_domain,
+    detect_runtime,
+    find_activity_cliffs,
+    plot_feature_importance,
+    plot_feature_importance_interactive,
+    plot_precision_recall_curves,
+    plot_precision_recall_curves_interactive,
+    plot_roc_curves,
+    plot_roc_curves_interactive,
+    print_summary,
+    select_feature_importance_model,
+)
+from dti_pipeline.features import compose_feature_matrix, featurize_dataset
+from dti_pipeline.training import (
+    evaluate_final_models_on_external,
+    fit_final_models,
+    run_nested_cv,
+    select_champion_model,
+    summarize_nested_cv_results,
+)
 
 
 def main() -> None:
@@ -2058,206 +74,146 @@ def main() -> None:
     runtime = detect_runtime()
     logger.log(runtime.message)
     logger.log(
-        f"Run profile = {RUN_PROFILE}; CPU workers = {MAX_PARALLEL_WORKERS}; "
-        f"classification CV = {CLASSIFICATION_CV_FOLDS}; regression CV = {REGRESSION_CV_FOLDS}; "
-        f"classification search iters = {CLASSIFICATION_SEARCH_ITERATIONS}; regression search iters = {REGRESSION_SEARCH_ITERATIONS}; "
-        f"benchmark trees = {FEATURE_BENCHMARK_TREES}"
+        f"Run profile={RUN_PROFILE}; representation={CLASSIFICATION_REPRESENTATION}; "
+        f"outer_folds={OUTER_CV_FOLDS}; inner_folds={INNER_CV_FOLDS}; "
+        f"search_iterations={CLASSIFICATION_SEARCH_ITERATIONS}; seed={RANDOM_SEED}"
     )
 
     curated_df = load_or_build_dataset(logger)
     classification_df = build_classification_dataset(curated_df, logger)
-    regression_df = build_regression_dataset(curated_df, logger)
+    _ = build_regression_dataset(curated_df, logger)
     feature_blocks = featurize_dataset(curated_df, logger)
 
-    classification_train_df, classification_test_df = split_classification_dataset(classification_df, logger)
-    regression_train_df, regression_test_df = split_regression_dataset(regression_df, logger)
-
-    classification_temporal_split = build_temporal_split(
-        classification_df,
-        TEMPORAL_CLASSIFICATION_TRAIN_PATH,
-        TEMPORAL_CLASSIFICATION_TEST_PATH,
-        logger,
-        require_binary_labels=True,
-    )
-    regression_temporal_split = build_temporal_split(
-        regression_df,
-        TEMPORAL_REGRESSION_TRAIN_PATH,
-        TEMPORAL_REGRESSION_TEST_PATH,
-        logger,
-        require_binary_labels=False,
-    )
-
-    classification_benchmarks, best_classification_representation = benchmark_classification_representations(classification_train_df, feature_blocks, logger)
-    regression_benchmarks, best_regression_representation = benchmark_regression_representations(regression_train_df, feature_blocks, logger)
-    pd.concat([classification_benchmarks, regression_benchmarks], ignore_index=True).to_csv(FEATURE_BENCHMARK_PATH, index=False)
-
-    classification_train_row_ids = classification_train_df["dataset_index"].to_numpy(dtype=int)
-    classification_test_row_ids = classification_test_df["dataset_index"].to_numpy(dtype=int)
-    regression_train_row_ids = regression_train_df["dataset_index"].to_numpy(dtype=int)
-    regression_test_row_ids = regression_test_df["dataset_index"].to_numpy(dtype=int)
-
-    classification_X_train, classification_feature_names = compose_feature_matrix(feature_blocks, best_classification_representation, row_ids=classification_train_row_ids)
-    classification_X_test, _ = compose_feature_matrix(feature_blocks, best_classification_representation, row_ids=classification_test_row_ids)
-    regression_X_train, _ = compose_feature_matrix(feature_blocks, best_regression_representation, row_ids=regression_train_row_ids)
-    regression_X_test, _ = compose_feature_matrix(feature_blocks, best_regression_representation, row_ids=regression_test_row_ids)
-
-    y_class_train = classification_train_df["label"].to_numpy(dtype=int)
-    y_class_test = classification_test_df["label"].to_numpy(dtype=int)
-    class_groups_train = scaffold_groups(classification_train_df)
-    y_reg_train = regression_train_df["median_pchembl"].to_numpy(dtype=float)
-    y_reg_test = regression_test_df["median_pchembl"].to_numpy(dtype=float)
-    reg_groups_train = scaffold_groups(regression_train_df)
-
-    with logger.section("Hyperparameter search for classification models"):
-        tuned_classification_models, classification_cv_results = tune_classification_models(classification_X_train, y_class_train, class_groups_train, logger)
-    classification_cv_results.to_csv(CLASSIFICATION_CV_RESULTS_PATH, index=False)
-
-    with logger.section("Training stacked classification ensemble"):
-        stacked_classifier = train_group_aware_stacking_classifier(
+    split_bundle = build_classification_splits(classification_df, logger)
+    internal_train_df = split_bundle["internal_train"]
+    external_df = split_bundle["external_validation"]
+    external_strategy = str(split_bundle["external_strategy"])
+    feature_manifest_df = pd.DataFrame(
+        [
             {
-                name: tuned_classification_models[name]
-                for name in ("Random Forest", "Extra Trees", "HistGradientBoosting")
-                if name in tuned_classification_models
-            },
-            classification_X_train,
-            y_class_train,
-            class_groups_train,
-            logger,
-        )
-
-    with logger.section("Training SMOTE-enhanced Extra Trees baseline"):
-        smote_extra_trees = fit_classification_model_by_name(
-            "Extra Trees + SMOTE",
-            tuned_classification_models,
-            classification_X_train,
-            y_class_train,
-            class_groups_train,
-            logger,
-        )
-
-    scaffold_classification_models = dict(tuned_classification_models)
-    scaffold_classification_models["Stacked Ensemble"] = stacked_classifier
-    scaffold_classification_models["Extra Trees + SMOTE"] = smote_extra_trees
-
-    with logger.section("Evaluating classification models on scaffold holdout"):
-        scaffold_classification_results = evaluate_classification_models(
-            scaffold_classification_models,
-            classification_X_test,
-            y_class_test,
-            split_name="scaffold",
-            logger=logger,
-        )
-
-    classification_results: List[ClassificationResult] = list(scaffold_classification_results)
-    logger.log(f"Computed scaffold classification metrics for {len(scaffold_classification_results)} model(s).")
-    best_scaffold_classifier = max(scaffold_classification_results, key=lambda result: (result.mcc, result.pr_auc))
+                "task": "classification",
+                "representation": CLASSIFICATION_REPRESENTATION,
+                "selection_mode": "fixed_predefined",
+                "used_for_primary_evaluation": True,
+            }
+        ]
+    )
+    feature_manifest_df.to_csv(FEATURE_BENCHMARK_PATH, index=False)
     logger.log(
-        f"Best scaffold-holdout classifier: {best_scaffold_classifier.name} "
-        f"(MCC={best_scaffold_classifier.mcc:.3f}, PR-AUC={best_scaffold_classifier.pr_auc:.3f})"
+        f"Using fixed representation '{CLASSIFICATION_REPRESENTATION}' for the primary scaffold-group evaluation. "
+        "No data-driven feature recipe selection is performed before nested CV."
     )
 
-    if classification_temporal_split is not None:
-        temporal_train_df, temporal_test_df, _ = classification_temporal_split
-        temporal_train_ids = temporal_train_df["dataset_index"].to_numpy(dtype=int)
-        temporal_test_ids = temporal_test_df["dataset_index"].to_numpy(dtype=int)
-        temporal_X_train, _ = compose_feature_matrix(feature_blocks, best_classification_representation, row_ids=temporal_train_ids)
-        temporal_X_test, _ = compose_feature_matrix(feature_blocks, best_classification_representation, row_ids=temporal_test_ids)
-        temporal_y_train = temporal_train_df["label"].to_numpy(dtype=int)
-        temporal_y_test = temporal_test_df["label"].to_numpy(dtype=int)
-        temporal_groups = scaffold_groups(temporal_train_df)
+    internal_row_ids = internal_train_df["dataset_index"].to_numpy(dtype=int)
+    external_row_ids = external_df["dataset_index"].to_numpy(dtype=int)
+    X_internal, classification_feature_names = compose_feature_matrix(feature_blocks, CLASSIFICATION_REPRESENTATION, row_ids=internal_row_ids)
+    X_external, _ = compose_feature_matrix(feature_blocks, CLASSIFICATION_REPRESENTATION, row_ids=external_row_ids)
+    y_internal = internal_train_df["label"].to_numpy(dtype=int)
+    y_external = external_df["label"].to_numpy(dtype=int)
+    groups_internal = scaffold_groups(internal_train_df)
 
-        with logger.section("Evaluating best classifier on temporal split"):
-            temporal_model = fit_classification_model_by_name(
-                best_scaffold_classifier.name,
-                tuned_classification_models,
-                temporal_X_train,
-                temporal_y_train,
-                temporal_groups,
-                logger,
-            )
-            classification_results.extend(
-                evaluate_classification_models(
-                    {best_scaffold_classifier.name: temporal_model},
-                    temporal_X_test,
-                    temporal_y_test,
-                    split_name="temporal",
-                    logger=logger,
-                )
-            )
-
-    with logger.section("Hyperparameter search for regression models"):
-        tuned_regression_models, regression_cv_results = tune_regression_models(regression_X_train, y_reg_train, reg_groups_train, logger)
-    regression_cv_results.to_csv(REGRESSION_CV_RESULTS_PATH, index=False)
-
-    with logger.section("Evaluating regression models on scaffold holdout"):
-        scaffold_regression_results = evaluate_regression_models(
-            tuned_regression_models,
-            regression_X_test,
-            y_reg_test,
-            split_name="scaffold",
+    with logger.section("Running nested cross-validation"):
+        nested_fold_df, nested_prediction_df, nested_tuning_df = run_nested_cv(
+            X=X_internal,
+            y=y_internal,
+            groups=groups_internal,
+            row_ids=internal_row_ids,
             logger=logger,
         )
+    nested_summary_df = summarize_nested_cv_results(nested_fold_df)
+    champion_model = select_champion_model(nested_summary_df)
+    logger.log(f"Champion model selected from nested CV: {champion_model}")
 
-    regression_results: List[RegressionResult] = list(scaffold_regression_results)
-    logger.log(f"Computed scaffold regression metrics for {len(scaffold_regression_results)} model(s).")
-    best_scaffold_regressor = min(scaffold_regression_results, key=lambda result: result.rmse)
-    logger.log(
-        f"Best scaffold-holdout regressor: {best_scaffold_regressor.name} "
-        f"(RMSE={best_scaffold_regressor.rmse:.3f}, R2={best_scaffold_regressor.r2:.3f})"
+    nested_fold_export = nested_fold_df.copy()
+    nested_fold_export["params"] = nested_fold_export["params"].apply(lambda value: json.dumps(value, sort_keys=True) if isinstance(value, dict) else value)
+    nested_fold_export.to_csv(CLASSIFICATION_CV_RESULTS_PATH, index=False)
+    nested_prediction_df.to_csv(CLASSIFICATION_NESTED_PREDICTIONS_PATH, index=False)
+
+    tuning_export_df = pd.concat([nested_tuning_df], ignore_index=True)
+    tuning_export_df["params"] = tuning_export_df["params"].apply(lambda value: json.dumps(value, sort_keys=True) if isinstance(value, dict) else value)
+
+    with logger.section("Fitting final calibrated models on the internal training set"):
+        final_artifacts, final_tuning_df = fit_final_models(
+            X=X_internal,
+            y=y_internal,
+            groups=groups_internal,
+            logger=logger,
     )
 
-    if regression_temporal_split is not None:
-        temporal_train_df, temporal_test_df, _ = regression_temporal_split
-        temporal_train_ids = temporal_train_df["dataset_index"].to_numpy(dtype=int)
-        temporal_test_ids = temporal_test_df["dataset_index"].to_numpy(dtype=int)
-        temporal_X_train, _ = compose_feature_matrix(feature_blocks, best_regression_representation, row_ids=temporal_train_ids)
-        temporal_X_test, _ = compose_feature_matrix(feature_blocks, best_regression_representation, row_ids=temporal_test_ids)
-        temporal_y_train = temporal_train_df["median_pchembl"].to_numpy(dtype=float)
-        temporal_y_test = temporal_test_df["median_pchembl"].to_numpy(dtype=float)
-        with logger.section("Evaluating best regressor on temporal split"):
-            temporal_model = clone(tuned_regression_models[best_scaffold_regressor.name])
-            fit_regressor(temporal_model, temporal_X_train, temporal_y_train)
-            regression_results.extend(
-                evaluate_regression_models(
-                    {best_scaffold_regressor.name: temporal_model},
-                    temporal_X_test,
-                    temporal_y_test,
-                    split_name="temporal",
-                    logger=logger,
-                )
-            )
+    final_tuning_export = final_tuning_df.copy()
+    final_tuning_export["params"] = final_tuning_export["params"].apply(lambda value: json.dumps(value, sort_keys=True) if isinstance(value, dict) else value)
+    tuning_export_df = pd.concat([tuning_export_df, final_tuning_export], ignore_index=True)
+    tuning_export_df.to_csv(CLASSIFICATION_TUNING_RESULTS_PATH, index=False)
 
-    classification_metrics_df = classification_results_to_frame(classification_results)
-    regression_metrics_df = regression_results_to_frame(regression_results)
-    classification_metrics_df.to_csv(CLASSIFICATION_METRICS_PATH, index=False)
-    regression_metrics_df.to_csv(REGRESSION_METRICS_PATH, index=False)
+    best_params_payload = {
+        model_name: {
+            "params": artifact.params,
+            "threshold": artifact.threshold,
+            "calibration_method": artifact.calibration_method,
+            "internal_oof_metrics": artifact.oof_metrics,
+        }
+        for model_name, artifact in final_artifacts.items()
+    }
+    write_json(CLASSIFICATION_BEST_PARAMS_PATH, best_params_payload)
 
-    plot_roc_curves(scaffold_classification_results, y_class_test, ROC_PLOT_PATH)
-    plot_precision_recall_curves(scaffold_classification_results, y_class_test, PR_PLOT_PATH)
-    importance_model, importance_model_name = select_feature_importance_model(scaffold_classification_models, scaffold_classification_results)
-    plot_feature_importance(importance_model, classification_feature_names, IMPORTANCE_PLOT_PATH)
-    logger.log(f"Feature-importance plot written using {importance_model_name}.")
-
-    best_regression_model = tuned_regression_models[best_scaffold_regressor.name]
-    plot_regression_predictions(y_reg_test, best_regression_model.predict(regression_X_test), REGRESSION_PLOT_PATH)
+    with logger.section("Evaluating final models on the external validation set"):
+        external_results = evaluate_final_models_on_external(
+            artifacts=final_artifacts,
+            X_external=X_external,
+            y_external=y_external,
+            split_name=external_strategy,
+            logger=logger,
+        )
 
     _, ad_threshold, inside_ad = compute_applicability_domain(
-        classification_train_row_ids,
-        classification_test_row_ids,
+        internal_row_ids,
+        external_row_ids,
         feature_blocks.morgan_fingerprints,
         logger,
     )
 
-    best_scaffold_classification_result = next(result for result in scaffold_classification_results if result.name == best_scaffold_classifier.name)
-    classification_predictions_df = classification_test_df.copy()
-    classification_predictions_df["predicted_probability"] = best_scaffold_classification_result.y_prob
-    classification_predictions_df["predicted_label"] = best_scaffold_classification_result.y_pred
-    classification_predictions_df["inside_applicability_domain"] = inside_ad
-    classification_predictions_df.to_csv(CLASSIFICATION_PREDICTIONS_PATH, index=False)
+    prediction_df = build_prediction_frame(
+        external_df=external_df,
+        external_results=external_results,
+        champion_model=champion_model,
+        inside_ad=inside_ad,
+    )
+    prediction_df.to_csv(CLASSIFICATION_PREDICTIONS_PATH, index=False)
 
-    regression_predictions_df = regression_test_df.copy()
-    regression_predictions_df["predicted_pchembl"] = best_scaffold_regressor.y_pred
-    regression_predictions_df.to_csv(REGRESSION_PREDICTIONS_PATH, index=False)
+    error_analysis_df, error_summary_df = build_error_analysis(prediction_df, champion_model)
+
+    leakage_report = build_leakage_report(
+        train_df=internal_train_df,
+        test_df=external_df,
+        feature_blocks=feature_blocks,
+        logger=logger,
+    )
+    write_json(CLASSIFICATION_CONFIG_PATH, {
+        "random_seed": RANDOM_SEED,
+        "run_profile": RUN_PROFILE,
+        "outer_cv_folds": OUTER_CV_FOLDS,
+        "inner_cv_folds": INNER_CV_FOLDS,
+        "search_iterations": CLASSIFICATION_SEARCH_ITERATIONS,
+        "representation": CLASSIFICATION_REPRESENTATION,
+        "representation_selection_mode": "fixed_predefined",
+        "feature_scaling": "pipeline_train_only",
+        "smote_policy": "applied_only_within_training_folds_for_smote_models",
+        "external_strategy": external_strategy,
+        "internal_train_path": str(CLASSIFICATION_INTERNAL_TRAIN_PATH),
+        "external_validation_path": str(CLASSIFICATION_EXTERNAL_PATH),
+    })
+
+    write_json(CLASSIFICATION_EXTERNAL_PATH.with_suffix(".metadata.json"), split_bundle["external_metadata"])
+    write_json(CLASSIFICATION_LEAKAGE_REPORT_PATH, leakage_report)
+
+    classification_metrics_df = classification_results_to_frame(nested_summary_df, external_results, champion_model)
+    classification_metrics_df.to_csv(CLASSIFICATION_METRICS_PATH, index=False)
+
+    plot_roc_curves(external_results, y_external, ROC_PLOT_PATH)
+    plot_precision_recall_curves(external_results, y_external, PR_PLOT_PATH)
+    importance_model, importance_model_name = select_feature_importance_model(final_artifacts, external_results)
+    plot_feature_importance(importance_model, classification_feature_names, IMPORTANCE_PLOT_PATH)
+    logger.log(f"Feature-importance plot written using {importance_model_name}.")
 
     activity_cliffs_df = find_activity_cliffs(curated_df, feature_blocks.morgan_fingerprints, logger)
     activity_cliffs_df.to_csv(ACTIVITY_CLIFF_PATH, index=False)
@@ -2272,41 +228,47 @@ def main() -> None:
         "dataset": {
             "curated_molecules": int(len(curated_df)),
             "classification_molecules": int(len(classification_df)),
-            "regression_molecules": int(len(regression_df)),
-            "classification_train": int(len(classification_train_df)),
-            "classification_test": int(len(classification_test_df)),
-            "regression_train": int(len(regression_train_df)),
-            "regression_test": int(len(regression_test_df)),
+            "internal_train_rows": int(len(internal_train_df)),
+            "external_validation_rows": int(len(external_df)),
+            "external_strategy": external_strategy,
+            "external_metadata": split_bundle["external_metadata"],
         },
         "features": {
-            "classification_representation": best_classification_representation,
-            "regression_representation": best_regression_representation,
+            "representation_used": CLASSIFICATION_REPRESENTATION,
+            "selection_mode": "fixed_predefined",
+            "feature_scaling": "pipeline_train_only",
+            "benchmark_results": feature_manifest_df.to_dict(orient="records"),
         },
-        "classification": classification_metrics_df.to_dict(orient="records"),
-        "regression": regression_metrics_df.to_dict(orient="records"),
-        "applicability_domain": {"threshold": ad_threshold, "inside_fraction": float(np.mean(inside_ad))},
+        "nested_cv_summary": nested_summary_df.to_dict(orient="records"),
+        "external_validation": classification_metrics_df[classification_metrics_df["stage"] == "external_validation"].to_dict(orient="records"),
+        "champion_model": champion_model,
+        "leakage_report": leakage_report,
+        "applicability_domain": {
+            "threshold": ad_threshold,
+            "inside_fraction": float(inside_ad.mean()),
+        },
+        "error_summary": error_summary_df.to_dict(orient="records"),
         "activity_cliffs": {
             "count": int(len(activity_cliffs_df)),
             "top_examples": activity_cliffs_df.head(5).to_dict(orient="records"),
         },
     }
-    RUN_REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    write_json(RUN_REPORT_PATH, report)
 
     print_summary(
         runtime=runtime,
         curated_df=curated_df,
         classification_df=classification_df,
-        regression_df=regression_df,
-        classification_train_df=classification_train_df,
-        classification_test_df=classification_test_df,
-        regression_train_df=regression_train_df,
-        regression_test_df=regression_test_df,
-        best_classification_representation=best_classification_representation,
-        best_regression_representation=best_regression_representation,
-        classification_results=classification_results,
-        regression_results=regression_results,
+        internal_train_df=internal_train_df,
+        external_df=external_df,
+        representation=CLASSIFICATION_REPRESENTATION,
+        nested_summary_df=nested_summary_df,
+        external_results=external_results,
+        champion_model=champion_model,
+        external_strategy=external_strategy,
+        leakage_report=leakage_report,
         ad_threshold=ad_threshold,
-        inside_ad_fraction=float(np.mean(inside_ad)),
+        inside_ad_fraction=float(inside_ad.mean()),
         activity_cliffs_count=int(len(activity_cliffs_df)),
     )
 
@@ -2324,4 +286,3 @@ if __name__ == "__main__":
                     handle.write("\n")
         except OSError:
             pass
-        raise

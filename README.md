@@ -38,7 +38,7 @@ using molecular structure information derived from SMILES strings.
 ### Installation
 
 ```bash
-pip install numpy pandas scikit-learn matplotlib plotly streamlit joblib
+pip install numpy pandas scipy scikit-learn matplotlib plotly streamlit joblib
 pip install rdkit          # or: conda install -c conda-forge rdkit
 pip install faiss-cpu      # optional, for faster AD computation
 ```
@@ -47,6 +47,12 @@ pip install faiss-cpu      # optional, for faster AD computation
 
 ```bash
 python drug_interaction_ml
+```
+
+For a quicker verification run, use the reduced profile:
+
+```bash
+DTI_PROFILE=fast python drug_interaction_ml
 ```
 
 ### Rerun Classification Only
@@ -64,6 +70,27 @@ This script reuses all cached data and checkpoints.
 ```bash
 streamlit run visualization_dashboard.py
 ```
+
+---
+
+## Current Evaluation Protocol
+
+The classification workflow now uses a stricter evaluation setup than the older single-holdout pipeline:
+
+- Nested cross-validation: scaffold-grouped outer folds for performance estimation, grouped inner folds for hyperparameter tuning
+- External validation: a scaffold holdout is used as the main unseen evaluation set, with temporal splits saved only as supplementary checks when available
+- Molecular representation: ECFP4 (`radius=2`, 2048 bits) plus RDKit descriptors by default
+- Preprocessing safety: feature scaling is handled inside sklearn pipelines, so scaler parameters are fit only on training folds
+- Hyperparameter optimization: randomized search as the default optimizer, with saved trial artefacts and fixed seeds for reproducibility
+- Class imbalance handling: class-weighted baselines are compared against a SMOTE comparator, and SMOTE is applied only inside training folds
+- Probability calibration: Platt or isotonic calibration fitted from training-only out-of-fold predictions
+- Threshold optimization: model-specific decision thresholds selected from training-only calibrated probabilities instead of a fixed 0.5 cutoff
+- Confidence intervals: mean and standard deviation are reported across outer folds
+- Leakage checks: exact overlap, scaffold overlap, and near-duplicate Tanimoto checks are written to `classification_leakage_report_v3.json`, and the scaffold external split is rejected if overlap is detected
+- Error analysis: false-positive / false-negative breakdowns are written to `classification_error_analysis_v3.csv` and `classification_error_summary_v3.csv`
+- Reproducibility artefacts: saved configs, split manifests, nested predictions, tuned parameters, and model metrics are all written to disk
+
+The older regression notes below are still useful for data provenance, but the classification artefacts in the repository now reflect this nested-CV + external-validation workflow.
 
 ---
 
