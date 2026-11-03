@@ -1,0 +1,9 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local environments
+.venv/
+
+# Process ID files from background runs
+*.pid

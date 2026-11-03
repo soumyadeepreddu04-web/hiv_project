@@ -199,8 +199,8 @@ def main() -> None:
         "feature_scaling": "pipeline_train_only",
         "smote_policy": "applied_only_within_training_folds_for_smote_models",
         "external_strategy": external_strategy,
-        "internal_train_path": str(CLASSIFICATION_INTERNAL_TRAIN_PATH),
-        "external_validation_path": str(CLASSIFICATION_EXTERNAL_PATH),
+        "internal_train_path": CLASSIFICATION_INTERNAL_TRAIN_PATH.name,
+        "external_validation_path": CLASSIFICATION_EXTERNAL_PATH.name,
     })
 
     write_json(CLASSIFICATION_EXTERNAL_PATH.with_suffix(".metadata.json"), split_bundle["external_metadata"])

@@ -9,6 +9,6 @@
   "feature_scaling": "pipeline_train_only",
   "smote_policy": "applied_only_within_training_folds_for_smote_models",
   "external_strategy": "scaffold_external",
-  "internal_train_path": "C:\\Users\\Kuldeep Singh\\.vscode\\hiv_project\\hiv_protease_classification_nested_train_v3.csv",
-  "external_validation_path": "C:\\Users\\Kuldeep Singh\\.vscode\\hiv_project\\hiv_protease_classification_external_validation_v3.csv"
+  "internal_train_path": "hiv_protease_classification_nested_train_v3.csv",
+  "external_validation_path": "hiv_protease_classification_external_validation_v3.csv"
 }
