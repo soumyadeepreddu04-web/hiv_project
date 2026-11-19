@@ -28,7 +28,7 @@ from dti_pipeline.config import (
     DOCUMENT_BATCH_SIZE,
     DOCUMENT_CACHE_PATH,
     INACTIVE_PCHEMBL_THRESHOLD,
-    MAX_PCHEMBL_SPREAD,
+    MAX_PCHEMBL_STD,
     MIN_CACHED_SMILES_FOR_OFFLINE_BUILD,
     MOLECULE_BATCH_SIZE,
     PAGE_SIZE,
@@ -422,7 +422,7 @@ def build_curated_dataset(raw_df: pd.DataFrame, logger: RunLogger, allow_documen
         per_molecule["min_pchembl"] <= INACTIVE_PCHEMBL_THRESHOLD
     )
     per_molecule = per_molecule[~has_label_conflict].copy()
-    per_molecule = per_molecule[per_molecule["pchembl_std"] <= MAX_PCHEMBL_SPREAD].copy()
+    per_molecule = per_molecule[per_molecule["pchembl_std"] <= MAX_PCHEMBL_STD].copy()
     logger.log(f"After molecule-level conflict and spread filtering: {len(per_molecule)} unique molecules remain")
 
     molecule_ids = sorted(per_molecule["molecule_chembl_id"].astype(str).unique())

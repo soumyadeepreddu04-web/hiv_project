@@ -129,7 +129,9 @@ ChEMBL API → Raw Data → Curation → Featurization (ECFP4 + descriptors)
 1. Load cached raw ChEMBL activity data (or download if missing)
 2. Keep exact-value measurements only
 3. Convert activity values to pChEMBL potency
-4. Remove noisy, duplicate, or contradictory records (max pChEMBL spread: 2.0)
+4. Drop molecules whose measurements contradict each other (any molecule with a reading
+   at or above the active cut-off *and* one at or below the inactive cut-off), then drop
+   molecules whose pChEMBL standard deviation across measurements exceeds 2.0 log units
 5. Fetch and cache SMILES strings + publication year metadata
 6. Standardize molecules with RDKit (uncharging, canonicalization)
 7. Aggregate repeated measurements into one row per molecule
