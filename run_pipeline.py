@@ -138,7 +138,7 @@ def main() -> None:
             y=y_internal,
             groups=groups_internal,
             logger=logger,
-    )
+        )
 
     final_tuning_export = final_tuning_df.copy()
     final_tuning_export["params"] = final_tuning_export["params"].apply(lambda value: json.dumps(value, sort_keys=True) if isinstance(value, dict) else value)

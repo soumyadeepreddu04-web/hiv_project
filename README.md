@@ -42,22 +42,17 @@ pip install -r requirements.txt
 ### Run the Full Pipeline
 
 ```bash
-python drug_interaction_ml
+python run_pipeline.py
 ```
 
 For a quicker verification run, use the reduced profile:
 
 ```bash
-DTI_PROFILE=fast python drug_interaction_ml
+DTI_PROFILE=fast python run_pipeline.py
 ```
 
-### Rerun Classification Only
-
-Reruns the classification pipeline using the cached local data instead of downloading from ChEMBL again:
-
-```bash
-python rerun_classification.py
-```
+Both commands reuse the cached ChEMBL tables in this repository if they are present, and only call
+the ChEMBL API when a cache file is missing.
 
 ### Visualization Dashboard
 
@@ -269,8 +264,8 @@ The pipeline supports a `DTI_PROFILE` environment variable:
 | `fast` | 2 | 2 | 1 |
 
 ```bash
-set DTI_PROFILE=fast        # Windows
-python drug_interaction_ml
+DTI_PROFILE=fast python run_pipeline.py     # macOS / Linux
+set DTI_PROFILE=fast && python run_pipeline.py   # Windows cmd
 ```
 
 Additional environment overrides: `DTI_N_JOBS`, `DTI_OUTER_CV_FOLDS`, `DTI_INNER_CV_FOLDS`, `DTI_CLASSIFICATION_SEARCH_ITERATIONS`, `DTI_CLASSIFICATION_REPRESENTATION`, `DTI_SMOTE_K_NEIGHBORS`, `DTI_CALIBRATION_AUTO_MIN_SAMPLES`, `DTI_NEAR_DUPLICATE_TANIMOTO_THRESHOLD`, `DTI_NEAR_DUPLICATE_MAX_EXAMPLES`.
@@ -295,14 +290,13 @@ However, the pipeline trains on **CPU** because:
 
 ```
 hiv_project/
-├── drug_interaction_ml          # Main pipeline script (no .py extension)
+├── run_pipeline.py              # Main pipeline entry point
 ├── dti_pipeline/                # Pipeline package
 │   ├── config.py                # Paths, thresholds, run profiles
 │   ├── data.py                  # ChEMBL download, curation, splits
 │   ├── features.py              # ECFP4 + RDKit descriptors
 │   ├── training.py              # Models, nested CV, calibration
 │   └── evaluation.py            # Metrics, AD, leakage checks, cliffs, plots
-├── rerun_classification.py      # Rerun from cached data
 ├── visualization_dashboard.py   # Streamlit interactive dashboard
 ├── requirements.txt             # Python dependencies
 ├── README.md
