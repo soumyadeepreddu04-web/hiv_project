@@ -212,6 +212,127 @@ Notes:
 
 ---
 
+## Design decisions
+
+Each of these was a choice between alternatives, so the reasoning matters more than the setting.
+
+**Scaffold-grouped splits, not random ones.** ChEMBL's HIV-1 protease data is largely congeneric
+series — many molecules are close analogues from the same paper. On a random split those analogues
+land on both sides, the model recognises the series rather than the chemistry, and the score is
+inflated. Every split here groups by Bemis–Murcko scaffold: the holdout, the 3 outer folds and the
+3 inner tuning folds. `StratifiedGroupKFold` was chosen over `GroupShuffleSplit` so that each fold
+keeps the same active/inactive ratio, which matters at a 9:1 imbalance.
+
+**MCC as the primary metric, not accuracy, PR-AUC or ROC-AUC.** 89.6% of the classification set is
+active. Measured on the 812-molecule holdout, a model that predicts "active" for everything scores
+**accuracy 0.895 and PR-AUC 0.895** while being useless; its MCC is 0.000. PR-AUC is the metric
+usually recommended for imbalanced data, but that advice assumes the positive class is the rare
+one, and here it is the common one. MCC uses all four cells of the confusion matrix, so it cannot
+be won by predicting the majority class. ROC-AUC is reported alongside because it is
+threshold-free and comparable to other papers, but it is not what the champion was selected on.
+
+**A `Dummy Prior` model is included in every table.** Not as filler — it is the floor. It makes
+the previous point concrete in the results rather than only in prose.
+
+**SMOTE written from scratch, and applied inside training folds only.** `simple_smote` in
+`training.py` is about 35 lines of NumPy rather than an `imbalanced-learn` import, because I wanted
+to be sure I knew where the synthetic molecules were being created. It is called inside the
+per-fold fit, never on data a model is scored against. The SMOTE model also sets
+`class_weight=None`: oversampling and class weighting both correct the same imbalance, and
+stacking them over-corrects.
+
+**Calibration and the decision threshold are fitted on training data only.** Tree ensembles give
+badly scaled probabilities, so each model gets an isotonic calibrator fitted on out-of-fold
+predictions from *inside* its training fold, and a decision threshold chosen by maximising MCC on
+those same calibrated training-fold values. The outer validation fold and the holdout see only the
+already-fixed calibrator and threshold. Isotonic over Platt is selected automatically when the
+fold has at least 150 samples and 20 of the minority class; below that it falls back to Platt,
+because isotonic regression overfits small samples.
+
+**The molecular representation is fixed in advance.** ECFP4 (2048 bits) plus 14 RDKit descriptors
+is set in `config.py` before anything is evaluated. `training.py` does contain a function that
+benchmarks five representations against each other, but it is deliberately **not** wired into the
+pipeline: choosing the representation by CV score and then reporting nested-CV performance for the
+winner lets the evaluation folds inform the feature choice, which makes the headline number
+optimistic. The function's docstring says so, and `feature_benchmarks_v3.csv` records that the
+representation was fixed rather than selected.
+
+**The champion was picked before the holdout was scored, and not changed afterwards.** Extra Trees
++ SMOTE won on nested-CV MCC. On the holdout, *plain* Extra Trees then scored very slightly higher
+(0.577 vs 0.574). Swapping the champion at that point would have been selecting on the test set, so
+the tables below still report Extra Trees + SMOTE as champion and state the comparison openly. The
+justification is in the fold-level numbers anyway: plain Extra Trees had an outer-fold SD of 0.122
+against the champion's 0.011, so its holdout result is not evidence of a better model.
+
+---
+
+## Limitations
+
+These are the problems I know about. Most were found by checking my own outputs rather than by
+anything the pipeline flags automatically.
+
+**The fingerprint cannot distinguish homologues that differ only in linker length.** The leakage
+report records one external molecule at Tanimoto **1.000** to a training molecule. They are not
+duplicates: they are macrocycles differing by a single `-OCH2CH2-` unit, 47 against 44 heavy atoms.
+Binary folded ECFP4 records whether a substructure is *present*, not how many times, and at radius
+2 every local environment in the longer linker already exists in the shorter one — so the two
+molecules have byte-identical feature vectors and the model cannot tell them apart, even though
+their Murcko scaffolds differ and the split is therefore technically valid. The same generator's
+count-based fingerprint separates them at 0.933. Switching to count fingerprints is the obvious
+next step and has not been done here.
+
+**The fingerprint is blind to stereochemistry.** `GetMorganGenerator(radius=2, fpSize=2048)`
+leaves `includeChirality` at its default of `False`, so a pair of enantiomers scores Tanimoto
+1.000; with chirality enabled the same pair scores 0.714. HIV-1 protease inhibitors are
+stereospecific peptidomimetics, so for this target in particular the representation is throwing
+away information that determines potency. Fixing it means re-running and re-reporting everything,
+which is why the numbers here are left as they are rather than quietly updated.
+
+**"No shared scaffolds" oversells how independent the holdout is.** 78 of the 812 external
+molecules have a training-set neighbour at Tanimoto >= 0.90. The split is valid by scaffold, but
+those 78 are near-analogues of something the model has seen, so the holdout score is somewhere
+between a true prospective estimate and an interpolation.
+
+**Scaffold groups are very uneven.** The 4,058 classification molecules fall into 1,751 scaffold
+groups. 1,206 of those are singletons (29.7% of all molecules), while the largest group holds 82
+molecules, so grouped folds are balanced by molecule count but not by chemical diversity. Bemis–
+Murcko is also a coarse definition: 10 molecules are acyclic and have an empty Murcko scaffold, so
+the code falls back to the full SMILES and each becomes its own group.
+
+**The split was not reproducible until now, and the stored metrics predate the fix.** The holdout
+was recomputed with `StratifiedGroupKFold` on every run. That function does not promise identical
+fold assignment across scikit-learn versions, and it does not deliver it: re-running the same code
+with the same seed (42) on scikit-learn 1.6.1 produced a 3,306/752 split instead of the 3,246/812
+one the published numbers came from. Only **162 of the original 812 holdout molecules were still in
+the holdout** — 1,240 molecules changed side — which also shifted the applicability-domain
+threshold (0.636 to 0.642) and the near-duplicate count (78 to 91). So "seed = 42" was never
+enough to make this repeatable, and the split manifest that would have fixed it was being written
+on every run and never read back. The pipeline now restores it when it matches the dataset, which
+I verified reproduces the committed 812-molecule holdout molecule-for-molecule. The metrics in the
+tables above were produced before this fix, on the split the manifest pins — they are now
+reproducible, but they were not when they were generated.
+
+**The hyperparameter search is small.** 2 random-search trials per model per fold on the default
+profile. The models are barely tuned, and the ranking between the mid-table models is not reliable
+at that budget.
+
+**The stored threshold is slightly optimistic in-sample.** The isotonic calibrator is fitted on a
+fold's out-of-fold probability vector and then applied to that same vector to choose the threshold.
+This happens entirely inside the training fold, so the outer-fold and holdout estimates are not
+affected, but the threshold and the calibrated training metrics in
+`classification_best_params_v3.json` are fitted on the data they are measured on.
+
+**The class imbalance is a property of the literature, not of chemistry.** Inactive compounds are
+under-published, so the 9:1 active ratio reflects reporting bias in ChEMBL. A model trained here
+predicts "is this the kind of molecule that gets published as an HIV-1 protease hit", which is not
+quite the same question as "is this molecule active".
+
+**One target, one dataset version, classification only.** The curation code assembles a continuous
+pChEMBL dataset of 4,621 molecules and the pipeline saves temporal splits, but no regression model
+is trained and no temporal evaluation is scored in v3.
+
+---
+
 ## Advanced Analyses
 
 ### Applicability Domain
