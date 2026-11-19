@@ -2,6 +2,26 @@
 
 An end-to-end cheminformatics / machine-learning pipeline that predicts small-molecule activity against **HIV-1 protease** using real bioactivity data from ChEMBL.
 
+## About this project
+
+I built this between April and May 2026, on my own. The question, the data curation rules, the
+validation design and all of the code are mine. It was not part of any taught course, it was not
+assessed, and I had no supervisor — I was in the final year of a BPharm and wanted to find out
+whether the medicinal chemistry I was being taught could be made to predict anything.
+
+Most of the work went into the evaluation rather than the models, and the commit history shows
+where the effort went. The first working version (6–7 April) was a single script: it already
+grouped the split by scaffold and already used MCC, but it scored each model on one grouped split,
+with no probability calibration, no tuned decision threshold, no baseline to compare against and
+no check on how similar the holdout really was to the training set. The rewrite on 2 May split it
+into the package described below and added all five: nested cross-validation, isotonic/Platt
+calibration, MCC-optimised thresholds, a `Dummy Prior` floor, and a leakage report that measures
+train/holdout similarity instead of assuming it.
+
+Everything I currently know to be wrong with it is in [Limitations](#limitations), including two
+properties of the molecular representation that I found only by reading my own leakage report, and
+a reproducibility bug in the split that I found while preparing this write-up and have fixed.
+
 The project covers:
 
 - **Classification** – active vs inactive compound prediction
