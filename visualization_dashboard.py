@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
-from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from PIL import Image
 from sklearn.metrics import average_precision_score, roc_auc_score
+
+from dti_pipeline.evaluation import (
+    plot_precision_recall_curves_interactive,
+    plot_roc_curves_interactive,
+)
 
 
 APP_DIR = Path(__file__).resolve().parent
-PIPELINE_PATH = APP_DIR / "drug_interaction_ml"
 DATA_DIR = APP_DIR
 
 CLASS_METRICS = DATA_DIR / "classification_metrics_v3.csv"
@@ -22,18 +24,7 @@ CLASS_PRED = DATA_DIR / "classification_predictions_v3.csv"
 CLASS_ERROR_SUMMARY = DATA_DIR / "classification_error_summary_v3.csv"
 CLASS_LEAKAGE = DATA_DIR / "classification_leakage_report_v3.json"
 CLASS_CONFIG = DATA_DIR / "classification_run_config_v3.json"
-REGRESSION_METRICS = DATA_DIR / "regression_metrics_v3.csv"
-REGRESSION_PLOT_PATH = DATA_DIR / "regression_predictions.png"
 FEATURE_IMPORTANCE_PATH = DATA_DIR / "feature_importance.png"
-
-
-def load_pipeline_module():
-    return SourceFileLoader("drug_interaction_ml_runtime", str(PIPELINE_PATH)).load_module()
-
-
-pipeline = load_pipeline_module()
-plot_roc_curves_interactive = pipeline.plot_roc_curves_interactive
-plot_precision_recall_curves_interactive = pipeline.plot_precision_recall_curves_interactive
 
 
 class ClassificationResult:
@@ -99,7 +90,7 @@ if CLASS_METRICS.exists():
             "calibration_method",
         ]
         keep_cols = [col for col in keep_cols if col in nested_df.columns]
-        st.dataframe(nested_df[keep_cols].sort_values(["champion_model", "mcc_mean"], ascending=[False, False]), use_container_width=True)
+        st.dataframe(nested_df[keep_cols].sort_values(["champion_model", "mcc_mean"], ascending=[False, False]), width="stretch")
 
     if not external_df.empty:
         st.subheader("Classification Scaffold External Validation")
@@ -115,7 +106,7 @@ if CLASS_METRICS.exists():
             "split",
         ]
         keep_cols = [col for col in keep_cols if col in external_df.columns]
-        st.dataframe(external_df[keep_cols].sort_values(["champion_model", "mcc"], ascending=[False, False]), use_container_width=True)
+        st.dataframe(external_df[keep_cols].sort_values(["champion_model", "mcc"], ascending=[False, False]), width="stretch")
 else:
     st.warning("Classification metrics file not found.")
 
@@ -133,7 +124,7 @@ if CLASS_CV_RESULTS.exists():
         "threshold",
     ]
     keep_cols = [col for col in keep_cols if col in cv_df.columns]
-    st.dataframe(cv_df[keep_cols].sort_values(["outer_fold", "mcc"], ascending=[True, False]), use_container_width=True)
+    st.dataframe(cv_df[keep_cols].sort_values(["outer_fold", "mcc"], ascending=[True, False]), width="stretch")
 
 if CLASS_CONFIG.exists():
     st.subheader("Classification Run Config")
@@ -145,13 +136,7 @@ if CLASS_LEAKAGE.exists():
 
 if CLASS_ERROR_SUMMARY.exists():
     st.subheader("Error Summary")
-    st.dataframe(pd.read_csv(CLASS_ERROR_SUMMARY), use_container_width=True)
-
-if REGRESSION_METRICS.exists():
-    st.subheader("Regression Summary")
-    st.dataframe(pd.read_csv(REGRESSION_METRICS), use_container_width=True)
-else:
-    st.warning("Regression metrics file not found.")
+    st.dataframe(pd.read_csv(CLASS_ERROR_SUMMARY), width="stretch")
 
 if CLASS_PRED.exists():
     pred_df = pd.read_csv(CLASS_PRED)
@@ -167,15 +152,9 @@ if CLASS_PRED.exists():
 else:
     st.warning("Classification predictions file not found.")
 
-if REGRESSION_PLOT_PATH.exists():
-    st.subheader("Regression Predictions")
-    st.image(Image.open(REGRESSION_PLOT_PATH), caption="Regression Predictions", use_container_width=True)
-else:
-    st.warning("Regression predictions image not found.")
-
 st.subheader("Feature Importance")
 if FEATURE_IMPORTANCE_PATH.exists():
-    st.image(Image.open(FEATURE_IMPORTANCE_PATH), caption="Feature Importance", use_container_width=True)
+    st.image(str(FEATURE_IMPORTANCE_PATH), caption="Top-25 Extra Trees feature importances")
 else:
     st.info("Feature importance image not available.")
 
