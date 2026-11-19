@@ -76,6 +76,7 @@ streamlit run visualization_dashboard.py
 - **Leakage checks:** exact overlap, scaffold overlap, and near-duplicate Tanimoto checks are written to `classification_leakage_report_v3.json`, and the scaffold external split is rejected if overlap is detected
 - **Error analysis:** false-positive / false-negative breakdowns are written to `classification_error_analysis_v3.csv` and `classification_error_summary_v3.csv`
 - **Reproducibility artefacts:** saved configs, split manifests, nested predictions, tuned parameters, and model metrics are all written to disk
+- **Pinned split:** the train/holdout split is restored from `classification_saved_splits_v3.csv` when it matches the dataset, because `StratifiedGroupKFold` does not assign folds identically across scikit-learn versions. Recomputing it on scikit-learn 1.6.1 produced a holdout sharing only 162 of its 812 molecules with the published one, so the metrics below were effectively unreproducible before this was pinned. `DTI_RECOMPUTE_SPLIT=1` forces a fresh split
 
 ---
 
@@ -270,7 +271,7 @@ DTI_PROFILE=fast python run_pipeline.py     # macOS / Linux
 set DTI_PROFILE=fast && python run_pipeline.py   # Windows cmd
 ```
 
-Additional environment overrides: `DTI_N_JOBS`, `DTI_OUTER_CV_FOLDS`, `DTI_INNER_CV_FOLDS`, `DTI_CLASSIFICATION_SEARCH_ITERATIONS`, `DTI_CLASSIFICATION_REPRESENTATION`, `DTI_SMOTE_K_NEIGHBORS`, `DTI_CALIBRATION_AUTO_MIN_SAMPLES`, `DTI_NEAR_DUPLICATE_TANIMOTO_THRESHOLD`, `DTI_NEAR_DUPLICATE_MAX_EXAMPLES`.
+Additional environment overrides: `DTI_N_JOBS`, `DTI_RECOMPUTE_SPLIT`, `DTI_OUTER_CV_FOLDS`, `DTI_INNER_CV_FOLDS`, `DTI_CLASSIFICATION_SEARCH_ITERATIONS`, `DTI_CLASSIFICATION_REPRESENTATION`, `DTI_SMOTE_K_NEIGHBORS`, `DTI_CALIBRATION_AUTO_MIN_SAMPLES`, `DTI_NEAR_DUPLICATE_TANIMOTO_THRESHOLD`, `DTI_NEAR_DUPLICATE_MAX_EXAMPLES`.
 
 ---
 

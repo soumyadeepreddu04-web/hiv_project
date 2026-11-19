@@ -1,3 +1,9 @@
+# Unpinned on purpose: this runs on a range of versions, and it is verified to run on
+# Python 3.9.6 with rdkit 2025.09.2, scikit-learn 1.6.1, pandas 2.3.3, numpy 2.0.2, scipy 1.13.1.
+#
+# One caveat worth knowing: StratifiedGroupKFold assigns folds differently across
+# scikit-learn versions, so the train/holdout split is restored from
+# classification_saved_splits_v3.csv rather than recomputed. See README -> Limitations.
 joblib
 numpy
 pandas

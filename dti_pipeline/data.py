@@ -34,6 +34,7 @@ from dti_pipeline.config import (
     PAGE_SIZE,
     RAW_CACHE_PATH,
     RANDOM_SEED,
+    RECOMPUTE_SPLIT,
     REGRESSION_TEST_PATH,
     REGRESSION_TRAIN_PATH,
     REQUEST_MAX_RETRIES,
@@ -548,12 +549,56 @@ def scaffold_split_integrity_summary(train_df: pd.DataFrame, test_df: pd.DataFra
     }
 
 
+def load_saved_scaffold_split(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame] | None:
+    """Restore the committed train/holdout split from the saved manifest, if it still matches the data.
+
+    `StratifiedGroupKFold` does not guarantee the same fold assignment across scikit-learn
+    versions, so recomputing the split can silently move molecules between train and holdout and
+    make the published metrics unreproducible. The manifest written by a previous run pins the
+    exact split instead. Set DTI_RECOMPUTE_SPLIT=1 to ignore it and split from scratch.
+    """
+    if RECOMPUTE_SPLIT:
+        logger.log("DTI_RECOMPUTE_SPLIT is set; computing a fresh scaffold split.")
+        return None
+    if not CLASSIFICATION_SPLIT_MANIFEST_PATH.exists():
+        return None
+
+    manifest = pd.read_csv(CLASSIFICATION_SPLIT_MANIFEST_PATH)
+    if not {"dataset_index", "split_family", "split_label"}.issubset(manifest.columns):
+        logger.log("Split manifest is missing expected columns; computing a fresh scaffold split.")
+        return None
+
+    scaffold_rows = manifest[manifest["split_family"] == "scaffold"]
+    train_ids = set(scaffold_rows.loc[scaffold_rows["split_label"] == "train", "dataset_index"].astype(int))
+    test_ids = set(scaffold_rows.loc[scaffold_rows["split_label"] == "holdout", "dataset_index"].astype(int))
+    if not train_ids or not test_ids:
+        return None
+
+    available_ids = set(df["dataset_index"].astype(int))
+    if train_ids | test_ids != available_ids or train_ids & test_ids:
+        logger.log(
+            f"Split manifest does not match the current dataset "
+            f"(manifest covers {len(train_ids | test_ids)} molecules, dataset has {len(available_ids)}); "
+            "computing a fresh scaffold split."
+        )
+        return None
+
+    train_df = df[df["dataset_index"].astype(int).isin(train_ids)].copy().reset_index(drop=True)
+    test_df = df[df["dataset_index"].astype(int).isin(test_ids)].copy().reset_index(drop=True)
+    logger.log(
+        f"Restored the saved scaffold split from {CLASSIFICATION_SPLIT_MANIFEST_PATH.name}: "
+        f"train={len(train_df)}, holdout={len(test_df)}."
+    )
+    return train_df, test_df
+
+
 def split_classification_dataset(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    splitter = StratifiedGroupKFold(n_splits=int(round(1.0 / TEST_SIZE)), shuffle=True, random_state=RANDOM_SEED)
-    groups = scaffold_groups(df)
-    train_idx, test_idx = next(splitter.split(df, df["label"], groups))
-    train_df = df.iloc[train_idx].copy().reset_index(drop=True)
-    test_df = df.iloc[test_idx].copy().reset_index(drop=True)
+    restored = load_saved_scaffold_split(df, logger)
+    if restored is not None:
+        train_df, test_df = restored
+    else:
+        train_df, test_df = compute_scaffold_split(df, logger)
+
     integrity = scaffold_split_integrity_summary(train_df, test_df)
     if any(int(value) > 0 for value in integrity.values()):
         raise RuntimeError(f"Scaffold split integrity violation detected: {integrity}")
@@ -570,6 +615,17 @@ def split_classification_dataset(df: pd.DataFrame, logger: RunLogger) -> Tuple[p
         f"scaffold_overlap={integrity['scaffold_overlap_count']}."
     )
     return train_df, test_df
+
+
+def compute_scaffold_split(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    splitter = StratifiedGroupKFold(n_splits=int(round(1.0 / TEST_SIZE)), shuffle=True, random_state=RANDOM_SEED)
+    groups = scaffold_groups(df)
+    train_idx, test_idx = next(splitter.split(df, df["label"], groups))
+    logger.log(
+        "Computed a fresh scaffold split with StratifiedGroupKFold. Note that fold assignment is "
+        "scikit-learn-version dependent; the manifest written by this run pins it for future runs."
+    )
+    return df.iloc[train_idx].copy().reset_index(drop=True), df.iloc[test_idx].copy().reset_index(drop=True)
 
 
 def split_regression_dataset(df: pd.DataFrame, logger: RunLogger) -> Tuple[pd.DataFrame, pd.DataFrame]:

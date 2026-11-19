@@ -54,6 +54,7 @@ CALIBRATION_AUTO_MIN_SAMPLES = env_int("DTI_CALIBRATION_AUTO_MIN_SAMPLES", 150)
 NEAR_DUPLICATE_TANIMOTO_THRESHOLD = float(os.environ.get("DTI_NEAR_DUPLICATE_TANIMOTO_THRESHOLD", "0.90"))
 NEAR_DUPLICATE_MAX_EXAMPLES = env_int("DTI_NEAR_DUPLICATE_MAX_EXAMPLES", 50)
 CLASSIFICATION_REPRESENTATION = os.environ.get("DTI_CLASSIFICATION_REPRESENTATION", "ecfp4_plus_descriptors").strip()
+RECOMPUTE_SPLIT = os.environ.get("DTI_RECOMPUTE_SPLIT", "").strip().lower() in {"1", "true", "yes"}
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 RAW_CACHE_PATH = SCRIPT_DIR / "hiv_protease_chembl_raw.csv"
