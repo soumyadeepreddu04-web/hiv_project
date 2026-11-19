@@ -308,7 +308,6 @@ def cross_validated_probabilities(
     estimator: Any,
     X: np.ndarray,
     y: np.ndarray,
-    groups: np.ndarray,
     cv_splits: Sequence[Tuple[np.ndarray, np.ndarray]],
     use_smote: bool = False,
     seed_offset: int = 0,
@@ -361,7 +360,6 @@ def tune_model_hyperparameters(
             candidate,
             X,
             y,
-            groups,
             inner_splits,
             use_smote=model_spec.uses_smote,
             seed_offset=seed_offset + trial_number * 10,
@@ -409,7 +407,6 @@ def fit_final_model_artifact(
         tuned_estimator,
         X,
         y,
-        groups,
         inner_splits,
         use_smote=model_spec.uses_smote,
         seed_offset=seed_offset,
@@ -447,6 +444,14 @@ def benchmark_classification_representations(
     blocks: Any,
     logger: RunLogger,
 ) -> Tuple[pd.DataFrame, str]:
+    """Compare feature recipes by grouped CV. Exploratory only: deliberately NOT called by the pipeline.
+
+    Picking the representation by CV score and then reporting nested-CV performance for the
+    winner would let the evaluation folds inform the feature choice, so the reported metric
+    would be optimistic. The pipeline therefore fixes `CLASSIFICATION_REPRESENTATION` in advance
+    and records that decision in `feature_benchmarks_v3.csv`. This function is kept for separate
+    exploratory runs, and it overwrites that file when used.
+    """
     y_train = train_df["label"].to_numpy(dtype=int)
     groups = scaffold_groups(train_df)
     row_ids = train_df["dataset_index"].to_numpy(dtype=int)
