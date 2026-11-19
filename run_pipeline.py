@@ -29,7 +29,6 @@ from dti_pipeline.config import (
     RUN_LOG_PATH,
     RUN_PROFILE,
     RUN_REPORT_PATH,
-    ClassificationResult,
     RunLogger,
     write_json,
 )
@@ -37,10 +36,8 @@ from dti_pipeline.data import (
     build_classification_dataset,
     build_classification_splits,
     build_regression_dataset,
-    build_temporal_split,
     load_or_build_dataset,
     scaffold_groups,
-    split_classification_dataset,
 )
 from dti_pipeline.evaluation import (
     build_error_analysis,
@@ -50,11 +47,8 @@ from dti_pipeline.evaluation import (
     compute_applicability_domain,
     find_activity_cliffs,
     plot_feature_importance,
-    plot_feature_importance_interactive,
     plot_precision_recall_curves,
-    plot_precision_recall_curves_interactive,
     plot_roc_curves,
-    plot_roc_curves_interactive,
     print_summary,
     select_feature_importance_model,
 )
