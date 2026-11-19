@@ -72,7 +72,7 @@ streamlit run visualization_dashboard.py
 - **Class imbalance handling:** class-weighted models are compared against a SMOTE variant, and SMOTE is applied only inside training folds
 - **Probability calibration:** Platt or isotonic calibration fitted from training-only out-of-fold predictions (isotonic was selected in v3)
 - **Threshold optimization:** model-specific decision thresholds selected from training-only calibrated probabilities instead of a fixed 0.5 cutoff
-- **Primary metric:** Matthews correlation coefficient (MCC). About 90% of the classification set is active, so accuracy and PR-AUC are inflated — a model that always predicts "active" scores 0.896 on both
+- **Primary metric:** Matthews correlation coefficient (MCC). 89.6% of the classification set is active, so accuracy and PR-AUC are inflated — on the 812-molecule holdout a model that always predicts "active" scores 0.895 accuracy and 0.895 PR-AUC, at MCC 0.000
 - **Leakage checks:** exact overlap, scaffold overlap, and near-duplicate Tanimoto checks are written to `classification_leakage_report_v3.json`, and the scaffold external split is rejected if overlap is detected
 - **Error analysis:** false-positive / false-negative breakdowns are written to `classification_error_analysis_v3.csv` and `classification_error_summary_v3.csv`
 - **Reproducibility artefacts:** saved configs, split manifests, nested predictions, tuned parameters, and model metrics are all written to disk
@@ -136,7 +136,9 @@ ChEMBL API → Raw Data → Curation → Featurization (ECFP4 + descriptors)
 5. Fetch and cache SMILES strings + publication year metadata
 6. Standardize molecules with RDKit (uncharging, canonicalization)
 7. Aggregate repeated measurements into one row per molecule
-8. **Scaffold-based** train/test split (80/20) using Murcko scaffolds + GroupShuffleSplit
+8. **Scaffold-based** train/test split (80/20) using Murcko scaffolds + `StratifiedGroupKFold`
+   (5 splits, first fold taken as the holdout), so no scaffold appears on both sides and the
+   active/inactive ratio is preserved in each side
 
 ---
 
@@ -149,7 +151,7 @@ ChEMBL API → Raw Data → Curation → Featurization (ECFP4 + descriptors)
 | Linear SVC | Linear margin classifier (class-weighted) |
 | Random Forest | Bagging ensemble (class-weighted) |
 | Extra Trees | Randomized splits ensemble (class-weighted) |
-| Extra Trees + SMOTE | Extra Trees with SMOTE oversampling inside training folds |
+| Extra Trees + SMOTE | Extra Trees with SMOTE oversampling inside training folds (hand-written, `simple_smote` in `training.py`) |
 | Gradient Boosting | Gradient-boosted trees |
 
 ---
