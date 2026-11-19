@@ -48,7 +48,6 @@ from dti_pipeline.evaluation import (
     build_prediction_frame,
     classification_results_to_frame,
     compute_applicability_domain,
-    detect_runtime,
     find_activity_cliffs,
     plot_feature_importance,
     plot_feature_importance_interactive,
@@ -71,8 +70,6 @@ from dti_pipeline.training import (
 
 def main() -> None:
     logger = RunLogger(RUN_LOG_PATH)
-    runtime = detect_runtime()
-    logger.log(runtime.message)
     logger.log(
         f"Run profile={RUN_PROFILE}; representation={CLASSIFICATION_REPRESENTATION}; "
         f"outer_folds={OUTER_CV_FOLDS}; inner_folds={INNER_CV_FOLDS}; "
@@ -219,12 +216,6 @@ def main() -> None:
     activity_cliffs_df.to_csv(ACTIVITY_CLIFF_PATH, index=False)
 
     report = {
-        "runtime": {
-            "backend": runtime.backend,
-            "adapters": runtime.adapters,
-            "gpu_name": runtime.gpu_name,
-            "message": runtime.message,
-        },
         "dataset": {
             "curated_molecules": int(len(curated_df)),
             "classification_molecules": int(len(classification_df)),
@@ -256,7 +247,6 @@ def main() -> None:
     write_json(RUN_REPORT_PATH, report)
 
     print_summary(
-        runtime=runtime,
         curated_df=curated_df,
         classification_df=classification_df,
         internal_train_df=internal_train_df,

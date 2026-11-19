@@ -112,14 +112,6 @@ BENCHMARK_REPRESENTATIONS: Sequence[str] = (
 
 
 @dataclass
-class RuntimeInfo:
-    backend: str
-    adapters: List[str]
-    gpu_name: str
-    message: str
-
-
-@dataclass
 class ClassificationResult:
     name: str
     split: str

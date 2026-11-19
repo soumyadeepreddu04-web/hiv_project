@@ -272,20 +272,6 @@ Additional environment overrides: `DTI_N_JOBS`, `DTI_OUTER_CV_FOLDS`, `DTI_INNER
 
 ---
 
-## GPU Note
-
-The script detects GPU hardware automatically. Detected adapter in this environment:
-
-- **AMD Radeon R7 M440**
-
-However, the pipeline trains on **CPU** because:
-
-- RDKit fingerprint generation is CPU-based
-- scikit-learn models are CPU-based
-- No AMD-compatible ML acceleration backend (ROCm / OpenCL) is installed
-
----
-
 ## Project Structure
 
 ```
@@ -302,6 +288,9 @@ hiv_project/
 ├── README.md
 └── *.csv / *.json / *.png       # Generated outputs (see tables above)
 ```
+
+Everything runs on CPU: RDKit fingerprinting and the scikit-learn models used here have no GPU
+path, so there is nothing to gain from one. `DTI_N_JOBS` controls worker count and defaults to 1.
 
 ---
 

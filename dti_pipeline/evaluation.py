@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
@@ -28,7 +27,6 @@ from dti_pipeline.config import (
     ClassificationResult,
     FeatureBlocks,
     RunLogger,
-    RuntimeInfo,
     to_jsonable,
 )
 from dti_pipeline.training import FinalModelArtifact
@@ -429,59 +427,7 @@ def classification_results_to_frame(
     return pd.DataFrame(rows)
 
 
-def probe_display_adapters() -> List[str]:
-    try:
-        probe = subprocess.run(
-            ["pnputil", "/enum-devices", "/class", "Display"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return []
-
-    if probe.returncode != 0 or not probe.stdout:
-        return []
-
-    adapter_names: List[str] = []
-    for line in probe.stdout.splitlines():
-        if line.strip().startswith("Device Description:"):
-            _, _, value = line.partition(":")
-            name = value.strip()
-            if name:
-                adapter_names.append(name)
-    return adapter_names
-
-
-def detect_runtime() -> RuntimeInfo:
-    adapters = probe_display_adapters()
-    amd_gpu = next((name for name in adapters if ("amd" in name.lower() or "radeon" in name.lower())), "")
-    if amd_gpu:
-        message = (
-            f"AMD GPU detected ({amd_gpu}), but this pipeline runs on CPU-first sklearn/RDKit components. "
-            "No GPU-only training path is used."
-        )
-        return RuntimeInfo(backend="cpu", adapters=adapters, gpu_name=amd_gpu, message=message)
-
-    if adapters:
-        return RuntimeInfo(
-            backend="cpu",
-            adapters=adapters,
-            gpu_name="",
-            message=f"Display adapters detected ({', '.join(adapters)}). Running on CPU.",
-        )
-
-    return RuntimeInfo(
-        backend="cpu",
-        adapters=[],
-        gpu_name="",
-        message="No display adapters were detected through pnputil. Running on CPU.",
-    )
-
-
 def print_summary(
-    runtime: RuntimeInfo,
     curated_df: pd.DataFrame,
     classification_df: pd.DataFrame,
     internal_train_df: pd.DataFrame,
@@ -496,9 +442,6 @@ def print_summary(
     inside_ad_fraction: float,
     activity_cliffs_count: int,
 ) -> None:
-    print("\n=== Runtime ===")
-    print(runtime.message)
-
     print("\n=== Dataset Summary ===")
     print(f"Curated molecules: {len(curated_df)}")
     print(f"Classification molecules: {len(classification_df)}")
